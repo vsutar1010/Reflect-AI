@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Sparkles, CheckCircle2, User, ArrowRight, RefreshCw, AlertCircle } from 'lucide-react';
+import { Sparkles, CheckCircle2, User, RefreshCw, AlertCircle } from 'lucide-react';
 import Navbar from '../components/common/Navbar';
 import Button from '../components/common/Button';
-import Input from '../components/common/Input';
 import Card from '../components/common/Card';
 import Loader from '../components/common/Loader';
+import AnimatedBackground from '../components/common/AnimatedBackground';
 import ProgressCard from '../components/features/analysis/ProgressCard';
 import QuestionCard from '../components/features/analysis/QuestionCard';
 import AnalysisSidebar from '../components/features/analysis/AnalysisSidebar';
@@ -71,6 +71,7 @@ export default function Analyze() {
       if (data.progress >= 100 || !data.question) {
         setIsCompleted(true);
         setProgress(100);
+        finalizeProfile();
       } else {
         setQuestion(data.question);
         setProgress(data.progress || Math.round(((currentQuestionIndex + 1) / TOTAL_QUESTIONS) * 100));
@@ -84,31 +85,31 @@ export default function Analyze() {
     }
   };
 
-  const handleFinalize = async (e) => {
-    e?.preventDefault();
-    if (!sessionId || !profileName.trim() || finalizing) return;
-
+  const finalizeProfile = async () => {
+    if (!sessionId) return;
     setFinalizing(true);
     setError(null);
 
     try {
-      const res = await api.finalizeAnalysis(sessionId, profileName.trim());
-      // Refresh context profiles
+      // No profile_name passed — backend extracts the person's name from
+      // their answers and uses it automatically.
+      const res = await api.finalizeAnalysis(sessionId, null);
+      const twinName = res?.profile_name || 'My Twin';
+      setProfileName(twinName);
+
       await fetchProfiles();
 
-      // If backend returned profile_id, select it
       if (res && res.profile_id) {
         selectProfile({
           id: res.profile_id,
-          name: profileName.trim(),
+          name: twinName,
           created_at: new Date().toISOString(),
           last_used: new Date().toISOString(),
           conversation_count: 0,
         });
       }
 
-      // Navigate to dashboard
-      navigate('/dashboard');
+      navigate('/mode');
     } catch (err) {
       console.error('Failed to finalize profile:', err);
       setError(err.message || 'Failed to finalize profile. Please try again.');
@@ -119,11 +120,7 @@ export default function Analyze() {
 
   return (
     <div className="relative min-h-screen bg-[#050505] text-[#F8FAFC] font-sans pb-24">
-      {/* Background Glows */}
-      <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
-        <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] rounded-full bg-[#4F8BFF]/10 blur-[150px]" />
-        <div className="absolute top-[20%] right-[-10%] w-[50%] h-[50%] rounded-full bg-[#8B5CF6]/10 blur-[150px]" />
-      </div>
+      <AnimatedBackground />
 
       <Navbar />
 
@@ -179,34 +176,20 @@ export default function Analyze() {
               <div className="space-y-2">
                 <h2 className="text-2xl font-bold text-white">Interview Complete!</h2>
                 <p className="text-sm text-slate-400 leading-relaxed max-w-md mx-auto">
-                  Your 10 responses have been processed into a custom personality profile. Give your digital twin a name to save it.
+                  {finalizing
+                    ? "Building your digital twin from your answers and detecting your name..."
+                    : `Your twin${profileName ? ` "${profileName}"` : ''} is ready.`}
                 </p>
               </div>
 
-              <form onSubmit={handleFinalize} className="space-y-4 text-left max-w-md mx-auto pt-2">
-                <Input
-                  label="Digital Twin Name"
-                  id="profileName"
-                  placeholder="e.g. Tanmay, Digital Twin Alpha, Personal Assistant"
-                  icon={User}
-                  value={profileName}
-                  onChange={(e) => setProfileName(e.target.value)}
-                  autoFocus
-                  required
-                />
-
-                <Button
-                  type="submit"
-                  variant="primary"
-                  size="lg"
-                  className="w-full justify-center mt-4"
-                  loading={finalizing}
-                  disabled={!profileName.trim()}
-                  icon={ArrowRight}
-                >
-                  Generate & Save Twin
-                </Button>
-              </form>
+              {finalizing ? (
+                <Loader text="Generating personality profile..." />
+              ) : (
+                <div className="flex items-center justify-center gap-2 text-sm text-slate-400">
+                  <User className="w-4 h-4" />
+                  <span>{profileName}</span>
+                </div>
+              )}
             </Card>
           </motion.div>
         ) : (

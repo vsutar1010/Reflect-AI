@@ -5,6 +5,7 @@ import { UserPlus, Sparkles, RefreshCw, AlertCircle } from 'lucide-react';
 import Navbar from '../components/common/Navbar';
 import Button from '../components/common/Button';
 import Loader from '../components/common/Loader';
+import AnimatedBackground from '../components/common/AnimatedBackground';
 import ProfileGrid from '../components/features/profile/ProfileGrid';
 import { useProfile } from '../context/ProfileContext';
 
@@ -14,11 +15,7 @@ export default function Profiles() {
 
   return (
     <div className="relative min-h-screen bg-[#050505] text-[#F8FAFC] font-sans pb-24">
-      {/* Background Glows */}
-      <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
-        <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] rounded-full bg-[#4F8BFF]/10 blur-[150px]" />
-        <div className="absolute top-[20%] right-[-10%] w-[50%] h-[50%] rounded-full bg-[#8B5CF6]/10 blur-[150px]" />
-      </div>
+      <AnimatedBackground />
 
       <Navbar />
 
@@ -88,9 +85,9 @@ export default function Profiles() {
                   View Dashboard
                 </Button>
               </Link>
-              <Link to="/chat">
+              <Link to="/mode">
                 <Button variant="secondary" size="sm">
-                  Start Chat
+                  Talk to Twin
                 </Button>
               </Link>
             </div>

@@ -17,6 +17,7 @@ import {
   ChevronRight
 } from 'lucide-react';
 import Navbar from '../components/common/Navbar';
+import AnimatedBackground from '../components/common/AnimatedBackground';
 
 // Image imports (resolved relative to src/assets/)
 import voice1Image from '../assets/voice1.jpg';
@@ -62,19 +63,12 @@ export default function Landing() {
 
   return (
     <div className="relative min-h-screen bg-[#050505] text-[#F8FAFC] overflow-x-hidden font-sans select-none">
-      {/* Background Grids, Noise, and Glows */}
+      {/* Subtle grid, matching the rest of the app */}
       <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
-        {/* Subtle grid */}
         <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff03_1px,transparent_1px),linear-gradient(to_bottom,#ffffff03_1px,transparent_1px)] bg-[size:4.5rem_4.5rem]" />
-        
-        {/* Noise overlay */}
-        <div className="absolute inset-0 opacity-[0.015] bg-[radial-gradient(#fff_1px,transparent_1px)] [background-size:16px_16px]" />
-
-        {/* Glows (OpenAI style radial gradients) */}
-        <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] rounded-full bg-[#4F8BFF]/10 blur-[150px]" />
-        <div className="absolute top-[10%] right-[-10%] w-[60%] h-[60%] rounded-full bg-[#8B5CF6]/10 blur-[150px]" />
-        <div className="absolute bottom-[20%] left-[20%] w-[50%] h-[50%] rounded-full bg-[#4F8BFF]/5 blur-[180px]" />
       </div>
+
+      <AnimatedBackground />
 
       <Navbar />
 

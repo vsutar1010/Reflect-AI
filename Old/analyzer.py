@@ -4,7 +4,7 @@ import json
 import re
 from pathlib import Path
 
-from ollama_client import OllamaClient
+from Old.ollama_client import OllamaClient
 
 PROFILE_FILE = Path("personality.json")
 CONVERSATION_FILE = Path("conversations.json")

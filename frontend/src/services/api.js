@@ -52,4 +52,17 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ session_id: sessionId, message }),
     }),
+
+  // Voice Chat Flow (Vapi)
+  getVoiceConfig: () => fetchJSON('/voice/config'),
+  startVoiceSession: (profileId) =>
+    fetchJSON('/voice/start', {
+      method: 'POST',
+      body: JSON.stringify({ profile_id: profileId }),
+    }),
+  endVoiceSession: (sessionId) =>
+    fetchJSON('/voice/end', {
+      method: 'POST',
+      body: JSON.stringify({ session_id: sessionId }),
+    }),
 };

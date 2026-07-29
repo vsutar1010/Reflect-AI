@@ -1145,6 +1145,8 @@ Return ONLY valid JSON.
 Required format
 
 {{
+    "name": "",
+
     "personality": {{
 
     }},
@@ -1165,8 +1167,39 @@ Required format
 
     ],
 
+    "example_replies": [
+        {{"friend": "", "twin": ""}}
+    ],
+
     "summary":""
 }}
+
+For "name": extract the person's first name if they mentioned it anywhere
+in the conversation. If no name was ever mentioned, return an empty string.
+
+For "example_replies": this is the most important field. Write 8 short
+example text-message exchanges showing EXACTLY how this specific person
+would reply if a close friend texted them casually on WhatsApp.
+
+Rules for example_replies:
+- "friend" is a short casual message a friend might send (hey, what are u
+  doing, i am bored, did u eat, where are u, what movie should we watch,
+  etc). Keep these varied and everyday.
+- "twin" is how THIS person would actually reply, based on their real
+  vocabulary, slang, spelling habits, capitalization, punctuation habits,
+  emoji usage, and typical reply length seen in the conversation above.
+- Most "twin" replies must be SHORT — 2 to 10 words. Some can be a single
+  word or a single emoji.
+- Copy this person's real texting habits: if they write in lowercase,
+  write lowercase. If they skip punctuation, skip it. If they use "u"
+  instead of "you", do that. If they never use emojis, don't add any.
+- Do NOT make the replies polite, complete, or grammatically correct.
+  Real texting is messy and short.
+- Do NOT write like a customer support agent or assistant. Never write
+  things like "I'm doing well, thank you for asking" or "How can I help".
+- These examples will be used directly to teach an AI how to text as
+  this person, so make them as realistic and specific to this person
+  as possible, not generic.
 
 Never wrap the JSON in markdown.
 """

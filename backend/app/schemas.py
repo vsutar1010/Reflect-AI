@@ -28,7 +28,7 @@ class AnalysisMessageResponse(BaseModel):
 
 class FinalizeAnalysisRequest(BaseModel):
     session_id: str
-    profile_name: str
+    profile_name: Optional[str] = None
 
 
 # ==========================================================
@@ -64,9 +64,16 @@ class StartChatRequest(BaseModel):
     profile_id: str
 
 
+class ChatHistoryMessage(BaseModel):
+    role: str
+    content: str
+    channel: Optional[str] = None
+
+
 class StartChatResponse(BaseModel):
     session_id: str
     message: str
+    history: List[ChatHistoryMessage] = []
 
 
 class ChatMessageRequest(BaseModel):
@@ -76,6 +83,37 @@ class ChatMessageRequest(BaseModel):
 
 class ChatMessageResponse(BaseModel):
     reply: str
+
+
+# ==========================================================
+# Voice Chat API (Vapi)
+# ==========================================================
+
+class VoiceConfigResponse(BaseModel):
+    enabled: bool
+    public_key: str
+    llm_provider: str
+    reason: str = ""
+
+
+class StartVoiceSessionRequest(BaseModel):
+    profile_id: str
+
+
+class StartVoiceSessionResponse(BaseModel):
+    session_id: str
+    public_key: str
+    assistant: Dict[str, Any]
+
+
+class EndVoiceSessionRequest(BaseModel):
+    session_id: str
+
+
+class VoiceSessionStatusResponse(BaseModel):
+    session_id: str
+    status: str
+    duration_seconds: float
 
 
 # ==========================================================

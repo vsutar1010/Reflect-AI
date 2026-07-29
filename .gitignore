@@ -1,0 +1,16 @@
+# Secrets
+.env
+backend/.env
+frontend/.env
+frontend/.env.local
+
+# Python
+__pycache__/
+*.pyc
+
+# Node
+node_modules/
+frontend/dist/
+
+# User-generated data
+backend/profiles/

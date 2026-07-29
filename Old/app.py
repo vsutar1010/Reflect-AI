@@ -1,5 +1,5 @@
 from analyzer import PersonalityAnalyzer
-from chat import TwinChat
+from Old.chat import TwinChat
 
 
 def banner():

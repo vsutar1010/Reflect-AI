@@ -1,0 +1,3 @@
+```
+Imagine I used to talk to someone regularly, but for some reason we are no longer in contact. During the analysis phase, the AI should analyze that person's conversations and learn how they naturally communicate. Later, if I want to chat with that person again, I should be able to talk to their AI twin and experience a conversation that feels as close as possible to chatting with the real person.
+```

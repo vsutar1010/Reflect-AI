@@ -1,4 +1,4 @@
-from ollama_client import OllamaClient
+from Old.ollama_client import OllamaClient
 
 client = OllamaClient()
 

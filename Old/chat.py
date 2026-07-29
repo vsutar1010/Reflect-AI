@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from ollama_client import OllamaClient
+from Old.ollama_client import OllamaClient
 
 PROFILE_FILE = Path("personality.json")
 
