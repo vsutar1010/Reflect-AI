@@ -8,13 +8,10 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-import json
-from pathlib import Path
 
+from app.database import conversations_collection, profiles_collection
 from app.services.communication_analyzer import CommunicationAnalyzer
 from app.services.ollama_client import OllamaClient
-
-PROFILE_FILE = Path("personality.json")
 
 
 class PersonalityAnalyzer:
@@ -804,62 +801,40 @@ Rules
 
         # Generate unique profile ID (full hex/uuid)
         profile_id = str(uuid.uuid4())
-        profile_dir = Path("profiles") / profile_id
-        conversations_dir = profile_dir / "conversations"
+        now = datetime.now().isoformat()
 
         try:
-            # Create directories recursively
-            conversations_dir.mkdir(parents=True, exist_ok=True)
+            # 1. Save the profile document: personality profile + metadata +
+            # the verbatim interview transcript (the person's raw source
+            # material — separate from `profile` (derived traits) and the
+            # conversations collection (the twin's own future chat log) —
+            # used to ground the twin's voice in how the real person
+            # actually spoke).
+            profiles_collection.insert_one(
+                {
+                    "_id": profile_id,
+                    "name": final_name,
+                    "created_at": now,
+                    "last_used": now,
+                    "version": 1,
+                    "profile": profile,
+                    "conversation": session["messages"],
+                }
+            )
 
-            # 1. Save personality profile JSON
-            with (profile_dir / "profile.json").open("w", encoding="utf-8") as f:
-                json.dump(
-                    profile,
-                    f,
-                    indent=4,
-                    ensure_ascii=False
-                )
+            # 2. Save the empty "default" conversation thread placeholder.
+            conversations_collection.insert_one(
+                {
+                    "_id": f"{profile_id}:default",
+                    "profile_id": profile_id,
+                    "thread": "default",
+                    "messages": [],
+                    "updated_at": now,
+                }
+            )
 
-            # 2. Save metadata JSON
-            metadata = {
-                "id": profile_id,
-                "name": final_name,
-                "created_at": datetime.now().isoformat(),
-                "last_used": datetime.now().isoformat(),
-                "version": 1
-            }
-            with (profile_dir / "metadata.json").open("w", encoding="utf-8") as f:
-                json.dump(
-                    metadata,
-                    f,
-                    indent=4,
-                    ensure_ascii=False
-                )
-
-            # 3. Save default conversation placeholder
-            with (conversations_dir / "default.json").open("w", encoding="utf-8") as f:
-                json.dump(
-                    {"messages": []},
-                    f,
-                    indent=4,
-                    ensure_ascii=False
-                )
-
-            # 4. Save the verbatim interview transcript. This is the
-            # person's raw source material — separate from profile.json
-            # (derived traits) and conversations/default.json (the
-            # twin's own future chat log) — used to ground the twin's
-            # voice in how the real person actually spoke.
-            with (profile_dir / "conversation.json").open("w", encoding="utf-8") as f:
-                json.dump(
-                    {"messages": session["messages"]},
-                    f,
-                    indent=4,
-                    ensure_ascii=False
-                )
-
-        except OSError as e:
-            raise RuntimeError(f"Failed to create profile or write files: {e}")
+        except Exception as e:
+            raise RuntimeError(f"Failed to create profile: {e}")
 
         # Return a dict containing the profile and the newly generated ID
         return {

@@ -2,7 +2,7 @@
 DigitalTwinEngine — the shared "brain" behind every digital twin.
 
 This is the one place that knows how to:
-  - load a profile (profile.json) and its source interview (conversation.json)
+  - load a profile and its source interview from MongoDB
   - turn that into a provider-agnostic TwinContext
   - read/write the twin's ongoing conversation memory
   - build a mood-adapting "dynamic context" from recent turns
@@ -16,18 +16,20 @@ separation is what lets Text Chat and Voice Chat use two entirely
 different LLMs while still being provably the same personality: they
 both start from the exact same TwinContext, built by the exact same
 code, from the exact same profile and memory.
+
+Storage: MongoDB, via app/database.py — a `profiles` collection (one
+document per twin, _id = profile UUID) and a `conversations` collection
+(one document per chat thread, _id = "{profile_id}:{thread}").
 """
 
 from __future__ import annotations
 
-import json
 from datetime import datetime
-from pathlib import Path
 from typing import Dict, List, Optional
 
+from app.database import conversations_collection, profiles_collection
 from app.services.twin_context import TwinContext
 
-PROFILES_DIR = Path("profiles")
 MAX_HISTORY = 20
 
 # Word this person actually uses most for greetings (from communication
@@ -56,51 +58,41 @@ class DigitalTwinEngine:
     # ============================================================
 
     def load_profile(self, profile_id: str) -> dict:
-        profile_file = PROFILES_DIR / profile_id / "profile.json"
-        if not profile_file.exists():
+        doc = profiles_collection.find_one({"_id": profile_id})
+        if not doc or "profile" not in doc:
             raise ProfileNotFoundError(f"No personality profile found for profile ID: {profile_id}")
-        try:
-            with open(profile_file, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except (json.JSONDecodeError, OSError):
-            raise ProfileNotFoundError("Personality profile is empty or invalid.")
+        return doc["profile"]
 
     def load_metadata(self, profile_id: str) -> dict:
-        meta_file = PROFILES_DIR / profile_id / "metadata.json"
-        if not meta_file.exists():
+        doc = profiles_collection.find_one({"_id": profile_id})
+        if not doc:
             return {}
-        try:
-            with open(meta_file, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except Exception:
-            return {}
+        return {
+            "id": doc.get("_id"),
+            "name": doc.get("name"),
+            "created_at": doc.get("created_at"),
+            "last_used": doc.get("last_used"),
+            "version": doc.get("version"),
+        }
 
     def load_source_conversation(self, profile_id: str) -> List[dict]:
         """
         The verbatim interview transcript captured during analysis
-        (profiles/{id}/conversation.json) — the person's own raw words,
-        distinct from profile.json (derived traits) and from
-        conversations/{thread}.json (the twin's own ongoing chat log).
+        (the profile document's `conversation` field) — the person's own raw
+        words, distinct from `profile` (derived traits) and from the
+        conversations collection (the twin's own ongoing chat log).
         """
-        conv_file = PROFILES_DIR / profile_id / "conversation.json"
-        if not conv_file.exists():
+        doc = profiles_collection.find_one({"_id": profile_id}, {"conversation": 1})
+        if not doc:
             return []
-        try:
-            with open(conv_file, "r", encoding="utf-8") as f:
-                return json.load(f).get("messages", [])
-        except Exception:
-            return []
+        return doc.get("conversation", [])
 
     def touch_last_used(self, profile_id: str) -> None:
-        meta_file = PROFILES_DIR / profile_id / "metadata.json"
-        if not meta_file.exists():
-            return
         try:
-            with open(meta_file, "r", encoding="utf-8") as f:
-                meta = json.load(f)
-            meta["last_used"] = datetime.now().isoformat()
-            with open(meta_file, "w", encoding="utf-8") as f:
-                json.dump(meta, f, indent=4, ensure_ascii=False)
+            profiles_collection.update_one(
+                {"_id": profile_id},
+                {"$set": {"last_used": datetime.now().isoformat()}},
+            )
         except Exception:
             pass
 
@@ -252,28 +244,31 @@ while preserving the user's identity.
     # continuous rather than like talking to two different twins. Each
     # message is tagged with the channel it came from for UI display.
 
-    def _thread_path(self, profile_id: str, thread: str) -> Path:
-        return PROFILES_DIR / profile_id / "conversations" / f"{thread}.json"
+    def _thread_id(self, profile_id: str, thread: str) -> str:
+        return f"{profile_id}:{thread}"
 
     def load_history(self, profile_id: str, thread: str = "default") -> List[dict]:
-        path = self._thread_path(profile_id, thread)
-        if not path.exists():
+        doc = conversations_collection.find_one({"_id": self._thread_id(profile_id, thread)})
+        if not doc:
             return []
-        try:
-            with open(path, "r", encoding="utf-8") as f:
-                data = json.load(f)
-                # Defensive: strip any legacy embedded system message from
-                # before conversation memory was separated from prompts.
-                return [m for m in data.get("messages", []) if m.get("role") in ("user", "assistant")]
-        except Exception:
-            return []
+        # Defensive: strip any legacy embedded system message from before
+        # conversation memory was separated from prompts.
+        return [m for m in doc.get("messages", []) if m.get("role") in ("user", "assistant")]
 
     def save_history(self, profile_id: str, messages: List[dict], thread: str = "default") -> None:
-        path = self._thread_path(profile_id, thread)
         try:
-            path.parent.mkdir(parents=True, exist_ok=True)
-            with open(path, "w", encoding="utf-8") as f:
-                json.dump({"messages": messages}, f, indent=4, ensure_ascii=False)
+            conversations_collection.update_one(
+                {"_id": self._thread_id(profile_id, thread)},
+                {
+                    "$set": {
+                        "profile_id": profile_id,
+                        "thread": thread,
+                        "messages": messages,
+                        "updated_at": datetime.now().isoformat(),
+                    }
+                },
+                upsert=True,
+            )
         except Exception:
             pass
 

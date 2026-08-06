@@ -1,7 +1,7 @@
 # ReflectAI — Architecture Documentation
 
 > **Purpose:** System design overview, data flow diagrams, API pipeline, AI architecture, and tech decisions for ReflectAI. Feed this file to any AI to understand HOW the system works end-to-end.
-> **Last Updated:** 2026-07-29
+> **Last Updated:** 2026-08-06
 
 ---
 
@@ -9,7 +9,7 @@
 
 ReflectAI is an AI-powered "digital twin" platform. It interviews a user through 10 natural language questions, analyzes how they communicate (vocabulary, punctuation, emoji usage, sentence length, etc.), and uses a local LLM (Ollama) to build a personality profile. That profile is then used to create a chatbot that mimics the user's communication style — a "digital twin".
 
-**Core value proposition:** Text chat runs fully locally. No data leaves the user's machine for text. Voice chat uses Vapi (cloud) for speech-to-text and text-to-speech, but all LLM inference runs locally (unless switched to `vapi-native` mode).
+**Core value proposition:** Text chat LLM inference runs fully locally via Ollama. Voice chat uses Vapi (cloud) for speech-to-text and text-to-speech, but LLM inference runs locally too (unless switched to `vapi-native` mode). Note: profile data and conversation history are stored in MongoDB Atlas (cloud-hosted), not on the local machine — see [Data Model](#data-model).
 
 **LLM:** Ollama running `mistral:7b-instruct-v0.3-q3_K_S` locally (configurable via `OLLAMA_MODEL` env var).
 
@@ -46,11 +46,11 @@ ReflectAI is an AI-powered "digital twin" platform. It interviews a user through
 │  │  └── ollama_client.py      OllamaClient (LLM HTTP wrapper)  │ │
 │  │                                                             │ │
 │  │  ┌──────────────────────────────────────────────────────┐  │ │
-│  │  │          File System (backend/profiles/)              │  │ │
-│  │  │  profiles/{uuid}/profile.json                        │  │ │
-│  │  │  profiles/{uuid}/metadata.json                       │  │ │
-│  │  │  profiles/{uuid}/conversation.json  (interview)      │  │ │
-│  │  │  profiles/{uuid}/conversations/default.json  (chat)  │  │ │
+│  │  │              MongoDB (app/database.py)                │  │ │
+│  │  │  profiles       — one doc per twin (profile +        │  │ │
+│  │  │                   metadata + interview transcript)   │  │ │
+│  │  │  conversations  — one doc per chat thread (text +    │  │ │
+│  │  │                   voice, shared)                     │  │ │
 │  │  └──────────────────────────────────────────────────────┘  │ │
 │  └─────────────────────────────────────────────────────────────┘ │
 │                         │                                        │
@@ -394,38 +394,48 @@ sessions[session_id] = {
 }
 ```
 
-### Disk Profile (`profiles/{uuid}/`)
+### MongoDB Collections
+
+`profiles` collection — one document per twin, `_id` = profile UUID:
 ```
-profile.json:
-├── communication           ← CommunicationAnalyzer output
-│   ├── statistics
-│   ├── vocabulary
-│   ├── conversation_style
-│   ├── writing_style
-│   └── writing_patterns
-├── llm_analysis           ← Ollama's personality JSON
-│   ├── personality        ← Big 5 traits with levels
-│   ├── thinking_pattern
-│   ├── emotional_style
-│   ├── conversation_behaviour
-│   ├── interests          ← string array
-│   └── summary            ← human-readable text
-├── identity_prompt        ← Full system prompt string
-├── generated_by           ← "ReflectAI"
-└── version               ← "1.0"
+{
+  _id            ← profile UUID
+  name           ← user-given profile name
+  created_at     ← ISO datetime
+  last_used      ← ISO datetime (updated on each chat/voice session)
+  version        ← 1 (int)
+  profile:
+    ├── communication           ← CommunicationAnalyzer output
+    │   ├── statistics
+    │   ├── vocabulary
+    │   ├── conversation_style
+    │   ├── writing_style
+    │   └── writing_patterns
+    ├── llm_analysis            ← Ollama's personality JSON
+    │   ├── personality         ← Big 5 traits with levels
+    │   ├── thinking_pattern
+    │   ├── emotional_style
+    │   ├── conversation_behaviour
+    │   ├── interests           ← string array
+    │   └── summary             ← human-readable text
+    ├── identity_prompt         ← Full system prompt string
+    ├── generated_by            ← "ReflectAI"
+    └── version                 ← "1.0"
+  conversation   ← verbatim interview transcript (source material)
+                   [{role, content}, ...]
+}
+```
 
-metadata.json:
-├── id          ← matches directory name (full UUID)
-├── name        ← user-given profile name
-├── created_at  ← ISO datetime
-├── last_used   ← ISO datetime (updated on each chat/voice session)
-└── version     ← 1 (int)
-
-conversation.json:           ← verbatim interview transcript (source material)
-└── messages: [{role, content}, ...]
-
-conversations/default.json:  ← ongoing twin chat memory (shared by text + voice)
-└── messages: [{role, content, channel: "text"|"voice"}, ...]
+`conversations` collection — one document per chat thread, `_id` =
+`"{profile_id}:{thread}"`, shared by text + voice:
+```
+{
+  _id          ← "{profile_id}:default"
+  profile_id   ← profile UUID
+  thread       ← "default"
+  messages     ← [{role, content, channel: "text"|"voice"}, ...]
+  updated_at   ← ISO datetime
+}
 ```
 
 ---
@@ -444,7 +454,7 @@ main.py (v2.0.0)
 │       └── services/twin_engine.py (DigitalTwinEngine)
 │           └── services/ollama_client.py
 ├── routers/profiles.py
-│   └── (reads profiles/ filesystem directly)
+│   └── (reads MongoDB profiles/conversations collections directly)
 └── routers/voice.py
     └── services/voice_chat_service.py
         ├── services/twin_engine.py (DigitalTwinEngine — shared)
@@ -518,12 +528,12 @@ FastAPI auto-generates interactive docs at: `http://localhost:8000/docs`
 | custom-llm Vapi mode (default) | Uses same Ollama twin for voice — voice and text chat are the same twin |
 | vapi-native mode option | Faster fallback when CPU Ollama is too slow for real-time voice |
 | ngrok tunnel for custom-llm | Vapi cloud can't reach localhost; tunnel bridges cloud → local |
-| File system storage | Zero setup, easy to inspect/debug, profiles are portable |
+| MongoDB storage | Profiles + conversation history survive crashes/restarts; connection pooling keeps reads/writes fast |
 | React Context for profiles | Avoids prop drilling; localStorage sync preserves selection across refreshes |
 | Router-based backend (v2.0.0) | Separates concerns; each feature area has its own router file |
 | Rolling context window (20 msgs) | Keeps LLM token count bounded and predictable |
 | Two-layer AI pipeline | Rule-based = fast + deterministic; LLM = semantic depth |
-| Per-turn disk persistence | Chat history survives backend restarts (resilient by design) |
+| Per-turn MongoDB persistence | Chat history survives backend restarts (resilient by design) |
 
 ---
 
@@ -532,7 +542,7 @@ FastAPI auto-generates interactive docs at: `http://localhost:8000/docs`
 ### Active Limitations
 | Limitation | Impact | Fix |
 |------------|--------|-----|
-| In-memory sessions | Sessions lost on server restart | SQLite or Redis |
+| In-memory session lookups | Active interview/chat/voice sessions (not profile or conversation data, which now live in MongoDB) are lost on server restart | SQLite or Redis for session state |
 | Voice TTFT ~3-7s | Poor UX in voice conversations | vapi-native mode or faster model |
 | Non-streaming text chat | Reply appears all at once | SSE or WebSocket streaming |
 | No auth | Anyone on port 8000 can access all profiles | JWT auth |
@@ -542,7 +552,7 @@ FastAPI auto-generates interactive docs at: `http://localhost:8000/docs`
 ### Feature Roadmap
 1. **Streaming text chat** — OllamaClient.stream_chat() already implemented, needs wiring to chat endpoint + frontend EventSource
 2. **Voice latency fix** — switch to `vapi-native` or faster local model
-3. **Database migration** — SQLite/Redis for session persistence
+3. **Session-state persistence** — SQLite/Redis so in-progress interview/chat/voice sessions also survive a restart (profile + conversation data is already persisted in MongoDB)
 4. **Conversation summarization** — `TwinChat.summarize_conversation()` is a stub
 5. **Multiple conversations** — `GET /api/profiles/:id/conversations` endpoint already built
 6. **Reflect feature** — journaling + mood tracking

@@ -30,6 +30,15 @@ OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://localhost:11434").rstrip("/"
 OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "mistral:7b-instruct-v0.3-q3_K_S")
 
 # ==========================================================
+# MongoDB (profiles + conversation history)
+# ==========================================================
+# Replaces the old backend/profiles/{uuid}/*.json flat-file storage.
+# MONGODB_URI is a full connection string (e.g. from MongoDB Atlas:
+# "mongodb+srv://<user>:<password>@<cluster>.mongodb.net/?retryWrites=true&w=majority").
+MONGODB_URI = os.environ.get("MONGODB_URI", "")
+MONGODB_DB_NAME = os.environ.get("MONGODB_DB_NAME", "reflectai")
+
+# ==========================================================
 # Public backend URL
 # ==========================================================
 # Vapi is a cloud service — it cannot reach "localhost". To let Vapi call

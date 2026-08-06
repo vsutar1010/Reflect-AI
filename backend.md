@@ -1,7 +1,7 @@
 # ReflectAI — Backend Documentation
 
 > **Purpose:** Complete reference for the FastAPI Python backend. Feed this file to any AI to get full context — every file, class, method, endpoint, data flow, and storage schema is documented here.
-> **Last Updated:** 2026-07-29 | **API Version:** 2.0.0
+> **Last Updated:** 2026-08-06 | **API Version:** 2.0.0
 
 ---
 
@@ -16,10 +16,12 @@
 | Ollama | local server | Local LLM inference |
 | emoji | Python lib | Emoji detection in communication analysis |
 | python-dotenv | latest | .env file loading |
+| pymongo | 4.9.2 | MongoDB driver |
+| dnspython | latest | Required by pymongo for `mongodb+srv://` (Atlas) URIs |
 | @vapi-ai/web | npm | Vapi Web SDK (frontend, not backend) |
 
 **Default LLM model:** `mistral:7b-instruct-v0.3-q3_K_S` (configurable via `OLLAMA_MODEL` env var)
-**No database.** Analysis and chat sessions are in-memory (dict). Profiles are saved as JSON files on disk.
+**Database:** MongoDB (Atlas or self-hosted, via `MONGODB_URI`). Profiles and conversation history (text + voice) are stored there — see [File Storage Schema](#file-storage-schema). In-progress analysis/chat/voice *sessions* (the live interview or an open chat's session_id lookup) remain in-memory dicts, not yet persisted.
 
 ---
 
@@ -36,7 +38,8 @@ backend/
     ├── __init__.py                         # Package marker
     ├── main.py                             # FastAPI app, router registration (v2.0.0)
     ├── schemas.py                          # Pydantic request/response models
-    ├── config.py                           # Centralized env var config (Ollama + Vapi)
+    ├── config.py                           # Centralized env var config (Ollama + Vapi + MongoDB)
+    ├── database.py                         # MongoDB client + collections (profiles, conversations)
     ├── dependencies.py                     # Shared service singletons (DI)
     ├── adapters/                           # External service adapters
     ├── routers/
@@ -57,17 +60,15 @@ backend/
         └── ollama_client.py                # OllamaClient — HTTP wrapper for Ollama REST API
 ```
 
-**Runtime-generated (not in repo):**
+**MongoDB collections (not files — see [File Storage Schema](#file-storage-schema)):**
 ```
-backend/
-└── profiles/                           # Created when first profile is finalized
-    └── {uuid}/                         # One directory per profile
-        ├── profile.json                # Full personality profile
-        ├── metadata.json               # id, name, created_at, last_used, version
-        ├── conversation.json           # Verbatim interview transcript (source material)
-        └── conversations/
-            └── default.json            # Persistent shared chat history {messages: [...]}
+profiles       — one document per twin (profile + metadata + interview transcript)
+conversations  — one document per chat thread (text + voice, shared)
 ```
+
+`backend/profiles/` (the old flat-file storage location) may still exist on
+disk as a pre-migration backup — see `backend/scripts/migrate_to_mongodb.py`
+— but the running app no longer reads or writes it.
 
 ---
 
@@ -88,6 +89,12 @@ ollama pull mistral:7b-instruct-v0.3-q3_K_S
 ollama serve
 ```
 
+**Also requires:** `MONGODB_URI` set in `.env` (e.g. a MongoDB Atlas connection
+string). The backend pings MongoDB on startup and fails fast with a clear
+error if it can't connect — see `app/database.py`. If you have existing data
+in `backend/profiles/` from before this migration, run
+`python scripts/migrate_to_mongodb.py` once to import it.
+
 **For Voice Chat:** You also need:
 1. A [Vapi](https://vapi.ai) account with `VAPI_PUBLIC_KEY` set in `.env`
 2. A public tunnel (e.g. ngrok) with `PUBLIC_BACKEND_URL` set in `.env`
@@ -104,6 +111,12 @@ All environment variables with defaults. Loaded from `.env` via `python-dotenv`.
 |-----|---------|-------------|
 | `OLLAMA_HOST` | `http://localhost:11434` | Ollama server URL |
 | `OLLAMA_MODEL` | `mistral:7b-instruct-v0.3-q3_K_S` | Default LLM model |
+
+### MongoDB Settings
+| Var | Default | Description |
+|-----|---------|-------------|
+| `MONGODB_URI` | `""` | Full connection string (Atlas `mongodb+srv://...` or local `mongodb://localhost:27017`) |
+| `MONGODB_DB_NAME` | `reflectai` | Database name |
 
 ### Vapi Settings
 | Var | Default | Description |
@@ -136,6 +149,25 @@ All environment variables with defaults. Loaded from `.env` via `python-dotenv`.
 
 ---
 
+## backend/app/database.py — MongoDB Connection (NEW)
+
+The single place that owns the MongoDB client. A `MongoClient` is created
+once at import time (thread-safe, pools connections internally) — mirrors
+the service-singleton pattern in `dependencies.py`.
+
+```python
+client = MongoClient(config.MONGODB_URI, tlsCAFile=certifi.where())
+db = client[config.MONGODB_DB_NAME]
+
+profiles_collection = db["profiles"]
+conversations_collection = db["conversations"]
+```
+
+- `ping()` — verifies the connection; called on app startup so a bad `MONGODB_URI` fails immediately instead of surfacing as a confusing 500 later
+- `init_indexes()` — creates an index on `conversations.profile_id` (used by conversation listing and cascade delete)
+
+---
+
 ## backend/app/main.py — FastAPI App (v2.0.0)
 
 Minimal router-based app. All route logic lives in routers/.
@@ -149,6 +181,12 @@ app.include_router(analyze.router)
 app.include_router(chat.router)
 app.include_router(voice.router)
 app.include_router(profiles.router)
+
+
+@app.on_event("startup")
+def on_startup():
+    database.ping()          # fails fast if MongoDB is unreachable
+    database.init_indexes()
 ```
 
 ---
@@ -330,7 +368,7 @@ If `stream=false` in request body: returns non-streaming JSON response instead.
 
 **Purpose:** The shared "brain" behind every digital twin. Both TwinChat (text) and VoiceChatService (voice) use this engine. This is what makes voice and text chat the **same digital twin** rather than two separately-configured assistants.
 
-**Constants:** `MAX_HISTORY = 20`, `PROFILES_DIR = Path("profiles")`
+**Constants:** `MAX_HISTORY = 20`. Storage is MongoDB (`app/database.py`), not disk.
 
 ### Class: DigitalTwinEngine
 
@@ -338,16 +376,16 @@ If `stream=false` in request body: returns non-streaming JSON response instead.
 ```python
 self._cache: Dict[str, Dict]
 # Keyed by profile_id → {"profile": ..., "system_messages": [...]}
-# Avoids re-reading multi-KB system prompts from disk on every turn
+# Avoids re-reading multi-KB system prompts from MongoDB on every turn
 ```
 
 #### Profile Loading
 | Method | Returns | Description |
 |--------|---------|-------------|
-| `load_profile(profile_id)` | dict | Reads `profiles/{id}/profile.json` |
-| `load_metadata(profile_id)` | dict | Reads `profiles/{id}/metadata.json` |
-| `load_source_conversation(profile_id)` | List[dict] | Reads interview transcript (`conversation.json`) |
-| `touch_last_used(profile_id)` | None | Updates `metadata.json` last_used timestamp |
+| `load_profile(profile_id)` | dict | Reads `profiles_collection` document's `profile` field |
+| `load_metadata(profile_id)` | dict | Reads `profiles_collection` document's id/name/created_at/last_used/version |
+| `load_source_conversation(profile_id)` | List[dict] | Reads interview transcript (`profiles_collection` document's `conversation` field) |
+| `touch_last_used(profile_id)` | None | Updates `last_used` field on the profile document |
 
 #### Prompt Building
 | Method | Returns | Description |
@@ -361,8 +399,8 @@ self._cache: Dict[str, Dict]
 #### Conversation Memory
 | Method | Returns | Description |
 |--------|---------|-------------|
-| `load_history(profile_id, thread="default")` | List[dict] | Reads `conversations/{thread}.json` |
-| `save_history(profile_id, messages, thread="default")` | None | Writes `conversations/{thread}.json` |
+| `load_history(profile_id, thread="default")` | List[dict] | Reads `conversations_collection` document `_id="{profile_id}:{thread}"` |
+| `save_history(profile_id, messages, thread="default")` | None | Upserts `conversations_collection` document `_id="{profile_id}:{thread}"` |
 | `append_message(profile_id, role, content, channel="text", thread="default")` | List[dict] | Appends + persists + returns updated history |
 | `get_recent_user_messages(history, limit=5)` | List[str] | Last N user message strings |
 | `invalidate_cache(profile_id)` | None | Clears cached system messages for a profile |
@@ -513,11 +551,9 @@ sessions[session_id] = {
 5. build_identity_prompt(communication, personality) → system prompt string
 6. merge_profile → { communication, llm_analysis, identity_prompt, generated_by, version }
 7. profile_id = uuid4()
-8. Write profiles/{profile_id}/profile.json
-9. Write profiles/{profile_id}/metadata.json
-10. Write profiles/{profile_id}/conversation.json (verbatim interview transcript)
-11. Write profiles/{profile_id}/conversations/default.json { messages: [] }
-12. delete_session → clean up memory
+8. Insert into `profiles_collection`: { _id: profile_id, name, created_at, last_used, version, profile, conversation: <verbatim interview transcript> }
+9. Insert into `conversations_collection`: { _id: "{profile_id}:default", profile_id, thread: "default", messages: [] }
+10. delete_session → clean up memory
 ```
 
 ### Identity Prompt Template (key sections)
@@ -611,61 +647,59 @@ OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "mistral:7b-instruct-v0.3-q3_K_S")
 
 ## File Storage Schema
 
-### Profile Directory Structure
-```
-profiles/
-└── {profile_uuid}/
-    ├── profile.json            # Full personality profile
-    ├── metadata.json           # Profile metadata
-    ├── conversation.json       # Verbatim interview transcript (source material)
-    └── conversations/
-        └── default.json        # Shared chat history (text + voice, persistent)
-```
+Storage is MongoDB, not files — two collections (see `app/database.py`).
+`backend/profiles/{uuid}/` may still exist on disk as a pre-migration
+backup (`scripts/migrate_to_mongodb.py`), but nothing in the running app
+reads or writes it.
 
-### profile.json Schema
+### `profiles` collection — one document per twin
 ```json
 {
-    "communication": {
-        "statistics": { "characters", "words", "sentences", "average_sentence_length" },
-        "vocabulary": { "word_frequency", "favorite_words", "short_forms", "fillers", "curse_words" },
-        "conversation_style": { "greetings", "endings", "response_length", "repeated_phrases" },
-        "writing_style": { "emoji_usage", "capitalization", "punctuation", "sentence_statistics", "paragraph_style", "question_style", "repeated_characters" },
-        "writing_patterns": { "typing", "possible_typos", "vocabulary", "longest_words" }
-    },
-    "llm_analysis": {
-        "personality": { "openness", "conscientiousness", "extraversion", "agreeableness" },
-        "thinking_pattern": { ... },
-        "emotional_style": { ... },
-        "conversation_behaviour": { ... },
-        "interests": ["topic1", ...],
-        "summary": "Plain text personality summary"
-    },
-    "identity_prompt": "Full multi-paragraph system prompt string...",
-    "generated_by": "ReflectAI",
-    "version": "1.0"
-}
-```
-
-### metadata.json Schema
-```json
-{
-    "id": "full-uuid-string",
+    "_id": "full-uuid-string",
     "name": "Profile Name",
     "created_at": "2026-07-28T10:00:00.000000",
     "last_used": "2026-07-29T15:00:00.000000",
-    "version": 1
+    "version": 1,
+    "profile": {
+        "communication": {
+            "statistics": { "characters", "words", "sentences", "average_sentence_length" },
+            "vocabulary": { "word_frequency", "favorite_words", "short_forms", "fillers", "curse_words" },
+            "conversation_style": { "greetings", "endings", "response_length", "repeated_phrases" },
+            "writing_style": { "emoji_usage", "capitalization", "punctuation", "sentence_statistics", "paragraph_style", "question_style", "repeated_characters" },
+            "writing_patterns": { "typing", "possible_typos", "vocabulary", "longest_words" }
+        },
+        "llm_analysis": {
+            "personality": { "openness", "conscientiousness", "extraversion", "agreeableness" },
+            "thinking_pattern": { ... },
+            "emotional_style": { ... },
+            "conversation_behaviour": { ... },
+            "interests": ["topic1", ...],
+            "summary": "Plain text personality summary"
+        },
+        "identity_prompt": "Full multi-paragraph system prompt string...",
+        "generated_by": "ReflectAI",
+        "version": "1.0"
+    },
+    "conversation": [
+        { "role": "user", "content": "..." },
+        { "role": "assistant", "content": "..." }
+    ]
 }
 ```
 
-### conversations/default.json Schema
+### `conversations` collection — one document per chat thread
 ```json
 {
+    "_id": "full-uuid-string:default",
+    "profile_id": "full-uuid-string",
+    "thread": "default",
     "messages": [
         { "role": "user", "content": "...", "channel": "text" },
         { "role": "assistant", "content": "...", "channel": "text" },
         { "role": "user", "content": "...", "channel": "voice" },
         { "role": "assistant", "content": "...", "channel": "voice" }
-    ]
+    ],
+    "updated_at": "2026-07-29T15:00:00.000000"
 }
 ```
 
@@ -677,11 +711,11 @@ Note: `channel` field is `"text"` or `"voice"` — used for UI display. Stripped
 
 | Issue | Location | Notes |
 |-------|----------|-------|
-| In-memory sessions only | analyzer.py, chat.py, voice_chat_service.py | Sessions lost on server restart; no database yet |
+| In-memory session lookups only | analyzer.py, chat.py, voice_chat_service.py | Active session_id → session dict lookups are lost on server restart. Profile + conversation data is persisted in MongoDB and unaffected. |
 | Voice latency 3–7s per turn | voice_chat_service.py | Local Ollama CPU TTFT is the bottleneck; switch to vapi-native or faster model |
 | Text chat non-streaming | chat.py, routers/chat.py | Full reply returned at once; OllamaClient.stream_chat() exists but not wired to text chat |
 | No authentication | main.py | CORS allows all origins — dev only |
 | Conversation summarization stub | chat.py | `summarize_conversation()` returns placeholder text |
 | Legacy personality.json at root | backend/ | Not used by API, safe to delete |
-| Session not cleaned up on finalize error | analyzer.py | Partial profile dir may be left on disk |
+| Session not cleaned up on finalize error | analyzer.py | Partial profile document may be left in MongoDB |
 | PersonalityProfile schema unused | schemas.py | Defined but no endpoint uses it as response_model |
