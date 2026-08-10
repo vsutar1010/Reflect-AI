@@ -108,6 +108,8 @@ class VoiceChatService:
 
         assistant_config = self.build_assistant_config(session_id, opening_line)
 
+        print(f"[voice] session {session_id} started — llm_provider={VAPI_LLM_PROVIDER!r} profile={profile_id}")
+
         return {
             "session_id": session_id,
             "assistant": assistant_config,
@@ -278,17 +280,26 @@ class VoiceChatService:
 
         session = self.sessions.get(session_id) if session_id else None
 
+        if session is None:
+            print(f"[voice webhook] {event_type} — no matching session (session_id={session_id!r})")
+
         if event_type == "status-update" and session:
             status = message.get("status")
+            print(f"[voice webhook] status-update session={session_id} status={status!r}")
             if status == "in-progress":
                 self.mark_call_started(session_id, call.get("id"))
             elif status in ("ended", "forwarding"):
                 session["status"] = "ended"
 
         elif event_type == "end-of-call-report" and session:
+            ended_reason = message.get("endedReason")
             session["status"] = "ended"
-            session["ended_reason"] = message.get("endedReason")
+            session["ended_reason"] = ended_reason
             self.engine.touch_last_used(session["profile_id"])
+            print(
+                f"[voice webhook] end-of-call-report session={session_id} "
+                f"provider={session.get('llm_provider')} endedReason={ended_reason!r}"
+            )
 
             # In vapi-native mode we never see per-turn traffic — the
             # only way we learn what was actually said is this report.
