@@ -320,3 +320,4 @@ All of this lives in `backend/.env` — see `backend/.env.example` for the full,
 - **"Vapi is not a constructor" in the browser console** — a known CJS/ESM bundling quirk with `@vapi-ai/web`; already worked around in `frontend/src/hooks/useVapiCall.js`. If you see it again after a dependency upgrade, that's the file to look at.
 - **Text chat replies take a very long time** — this is Ollama running on CPU; a smaller/faster model in `OLLAMA_MODEL` helps. This does not affect Voice Chat, which doesn't use Ollama in the default `vapi-native` mode.
 - **ngrok URL changed and voice stopped working** — expected on the free plan every time you restart ngrok. Update `PUBLIC_BACKEND_URL` and restart the backend.
+Author -Vaibhav Sutar
