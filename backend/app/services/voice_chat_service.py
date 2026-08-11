@@ -81,6 +81,7 @@ class VoiceChatService:
         context = self.engine.build_twin_context(profile_id)
         history = self.engine.load_history(profile_id)
         opening_line = self.engine.build_opening_line(profile_id)
+        voice_config = self.engine.get_voice_config(profile_id) or {}
 
         self.sessions[session_id] = {
             "profile_id": profile_id,
@@ -93,6 +94,12 @@ class VoiceChatService:
             # can't cause a session to be handled inconsistently between
             # the assistant config and the webhook/turn handlers.
             "llm_provider": VAPI_LLM_PROVIDER,
+            # Per-profile voice (see PUT /api/profiles/{id}/voice) falls
+            # back to the global default for profiles that haven't picked
+            # one yet — this is what used to make every twin speak in the
+            # same voice regardless of who they are.
+            "voice_provider": voice_config.get("provider") or VAPI_VOICE_PROVIDER,
+            "voice_id": voice_config.get("voice_id") or VAPI_VOICE_ID,
         }
 
         self.engine.touch_last_used(profile_id)
@@ -125,8 +132,8 @@ class VoiceChatService:
             "firstMessage": opening_line,
             "firstMessageMode": "assistant-speaks-first",
             "voice": {
-                "provider": VAPI_VOICE_PROVIDER,
-                "voiceId": VAPI_VOICE_ID,
+                "provider": session["voice_provider"],
+                "voiceId": session["voice_id"],
             },
             "transcriber": {
                 "provider": VAPI_TRANSCRIBER_PROVIDER,

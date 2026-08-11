@@ -87,6 +87,16 @@ class DigitalTwinEngine:
             return []
         return doc.get("conversation", [])
 
+    def get_voice_config(self, profile_id: str) -> Optional[dict]:
+        """
+        A profile's chosen Vapi voice (provider + voice_id + the gender
+        preset it was picked from), set via PUT /api/profiles/{id}/voice.
+        Returns None if the profile hasn't picked one yet — callers fall
+        back to the global VAPI_VOICE_PROVIDER/VAPI_VOICE_ID default.
+        """
+        doc = profiles_collection.find_one({"_id": profile_id}, {"voice": 1})
+        return doc.get("voice") if doc else None
+
     def touch_last_used(self, profile_id: str) -> None:
         try:
             profiles_collection.update_one(

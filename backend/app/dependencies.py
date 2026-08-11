@@ -10,8 +10,10 @@ from app.services.analyzer import PersonalityAnalyzer
 from app.services.chat import TextChatService
 from app.services.twin_engine import DigitalTwinEngine
 from app.services.voice_chat_service import VoiceChatService
+from app.services.whatsapp_import_service import WhatsAppImportService
 
 analyzer = PersonalityAnalyzer()
+whatsapp_import_service = WhatsAppImportService()
 
 engine = DigitalTwinEngine()
 text_chat_service = TextChatService(engine)

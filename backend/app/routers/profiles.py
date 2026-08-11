@@ -2,9 +2,10 @@ from datetime import datetime
 
 from fastapi import APIRouter, HTTPException
 
+from app.config import VAPI_VOICE_PRESETS
 from app.database import conversations_collection, profiles_collection
 from app.dependencies import engine
-from app.schemas import SuccessResponse
+from app.schemas import SetProfileVoiceRequest, SuccessResponse
 
 router = APIRouter(prefix="/api/profiles", tags=["profiles"])
 
@@ -45,8 +46,35 @@ def get_profile(id: str):
             "created_at": doc.get("created_at"),
             "last_used": doc.get("last_used"),
             "version": doc.get("version"),
+            "voice": doc.get("voice"),
         }
         return {"metadata": meta, "profile": doc.get("profile", {})}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.put("/{id}/voice", response_model=SuccessResponse)
+def set_profile_voice(id: str, req: SetProfileVoiceRequest):
+    preset = VAPI_VOICE_PRESETS.get(req.gender)
+    if not preset:
+        options = ", ".join(VAPI_VOICE_PRESETS.keys())
+        raise HTTPException(status_code=400, detail=f"Unknown voice option '{req.gender}'. Choose one of: {options}")
+
+    try:
+        result = profiles_collection.update_one(
+            {"_id": id},
+            {"$set": {"voice": {"gender": req.gender, **preset}}},
+        )
+        if result.matched_count == 0:
+            raise HTTPException(status_code=404, detail="Profile not found")
+
+        # Voice Chat caches per-profile voice choice inside live in-memory
+        # call sessions (set once at session start) — nothing to invalidate
+        # here since there's no persistent per-profile cache in the engine,
+        # only the next /api/voice/start reads this field fresh.
+        return SuccessResponse(success=True, message="Voice updated.")
     except HTTPException:
         raise
     except Exception as e:

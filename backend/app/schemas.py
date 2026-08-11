@@ -32,6 +32,30 @@ class FinalizeAnalysisRequest(BaseModel):
 
 
 # ==========================================================
+# WhatsApp Chat Import
+# ==========================================================
+
+class WhatsAppParticipant(BaseModel):
+    name: str
+    message_count: int
+
+
+class WhatsAppUploadResponse(BaseModel):
+    upload_id: str
+    participants: List[WhatsAppParticipant]
+    total_messages: int
+    system_messages_skipped: int
+    media_messages_skipped: int
+    deleted_messages_skipped: int
+
+
+class WhatsAppFinalizeRequest(BaseModel):
+    upload_id: str
+    target_sender: str
+    profile_name: Optional[str] = None
+
+
+# ==========================================================
 # Personality Profile
 # ==========================================================
 
@@ -114,6 +138,14 @@ class VoiceSessionStatusResponse(BaseModel):
     session_id: str
     status: str
     duration_seconds: float
+
+
+# ==========================================================
+# Profile Voice Selection
+# ==========================================================
+
+class SetProfileVoiceRequest(BaseModel):
+    gender: str  # "male" | "female" — keys into config.VAPI_VOICE_PRESETS
 
 
 # ==========================================================

@@ -11,6 +11,7 @@ import {
   Heart,
   Compass,
   RefreshCcw,
+  Mic,
 } from 'lucide-react';
 import Navbar from '../components/common/Navbar';
 import Button from '../components/common/Button';
@@ -47,6 +48,7 @@ export default function Dashboard() {
   const [conversations, setConversations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [voiceSaving, setVoiceSaving] = useState(false);
 
   const loadData = async () => {
     if (!selectedProfile) {
@@ -73,6 +75,20 @@ export default function Dashboard() {
     loadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedProfile]);
+
+  const handleSetVoice = async (gender) => {
+    if (!selectedProfile || voiceSaving) return;
+    setVoiceSaving(true);
+    setError(null);
+    try {
+      await api.setProfileVoice(selectedProfile.id, gender);
+      await loadData();
+    } catch (err) {
+      setError(err.message || 'Failed to update voice.');
+    } finally {
+      setVoiceSaving(false);
+    }
+  };
 
   if (!selectedProfile) {
     return (
@@ -113,6 +129,7 @@ export default function Dashboard() {
   const comm = profile.communication || {};
   const stats = comm.statistics || {};
   const vocab = comm.writing_patterns?.vocabulary || {};
+  const currentGender = meta.voice?.gender || 'male';
 
   return (
     <div className="relative min-h-screen bg-[#050505] text-white pb-20">
@@ -233,6 +250,40 @@ export default function Dashboard() {
 
           {/* Right: Communication + Conversations */}
           <div className="space-y-6">
+            <Card className="space-y-4">
+              <div className="flex items-center gap-2 pb-4 border-b border-white/10">
+                <Mic className="w-5 h-5 text-[#8B5CF6]" />
+                <h3 className="font-bold text-white text-lg">Voice</h3>
+              </div>
+              <p className="text-xs text-slate-500 -mt-2">Used for Voice Chat calls with this twin.</p>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleSetVoice('male')}
+                  disabled={voiceSaving}
+                  className={`py-2.5 rounded-xl text-sm font-medium border transition-colors disabled:opacity-50 ${
+                    currentGender === 'male'
+                      ? 'bg-[#4F8BFF]/15 border-[#4F8BFF]/40 text-[#4F8BFF]'
+                      : 'bg-white/5 border-white/10 text-slate-400 hover:text-white hover:border-white/20'
+                  }`}
+                >
+                  Male
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSetVoice('female')}
+                  disabled={voiceSaving}
+                  className={`py-2.5 rounded-xl text-sm font-medium border transition-colors disabled:opacity-50 ${
+                    currentGender === 'female'
+                      ? 'bg-[#8B5CF6]/15 border-[#8B5CF6]/40 text-[#8B5CF6]'
+                      : 'bg-white/5 border-white/10 text-slate-400 hover:text-white hover:border-white/20'
+                  }`}
+                >
+                  Female
+                </button>
+              </div>
+            </Card>
+
             <Card className="space-y-4">
               <div className="flex items-center gap-2 pb-4 border-b border-white/10">
                 <BookOpen className="w-5 h-5 text-[#4F8BFF]" />

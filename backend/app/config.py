@@ -82,10 +82,23 @@ VAPI_SECRET_HEADER = "x-reflectai-secret"
 # config per call instead — no dashboard setup required.
 VAPI_ASSISTANT_ID = os.environ.get("VAPI_ASSISTANT_ID", "")
 
-# Voice (text-to-speech) provider + voice used for every twin unless a
-# profile specifies its own (future: per-profile voice selection).
+# Voice (text-to-speech) provider + voice used as the fallback when a
+# profile hasn't picked its own voice yet (see VAPI_VOICE_PRESETS below
+# for the per-profile male/female options — set via PUT
+# /api/profiles/{id}/voice, stored on the profile document).
 VAPI_VOICE_PROVIDER = os.environ.get("VAPI_VOICE_PROVIDER", "vapi")
 VAPI_VOICE_ID = os.environ.get("VAPI_VOICE_ID", "Elliot")
+
+# Curated presets a profile can pick between. Both are Vapi's own
+# built-in "vapi" provider voices (no extra account/credential needed) —
+# see docs.vapi.ai/providers/voice/vapi-voices for the full catalog.
+# Deliberately keyed by "provider"/"voice_id" (not just a raw voice
+# name) so a future per-profile ElevenLabs clone can slot into this same
+# shape without a schema change — just a different provider/voice_id.
+VAPI_VOICE_PRESETS = {
+    "male": {"provider": "vapi", "voice_id": "Elliot"},
+    "female": {"provider": "vapi", "voice_id": "Savannah"},
+}
 
 # Transcriber (speech-to-text) provider/model/language.
 VAPI_TRANSCRIBER_PROVIDER = os.environ.get("VAPI_TRANSCRIBER_PROVIDER", "deepgram")

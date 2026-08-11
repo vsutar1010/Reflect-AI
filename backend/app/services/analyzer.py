@@ -721,83 +721,71 @@ Rules
 
         session = self.get_session(session_id)
 
-        communication = self.communication.analyze(
+        result = self._build_and_save_profile(session["messages"], profile_name)
 
-            session["messages"]
+        # Kept on the session for get_personality()/get_communication()/
+        # export_session() — not used by the WhatsApp import path, which
+        # has no session object.
+        session["communication"] = result["communication"]
+        session["personality"] = result["profile"]
 
-        )
+        return {
+            "profile_id": result["profile_id"],
+            "profile_name": result["profile_name"],
+            "profile": result["profile"],
+        }
 
-        prompt = self.communication.build_llm_prompt(
+    def analyze_whatsapp_messages(
+        self,
+        messages,
+        profile_name: str = None
+    ):
+        """
+        Entry point for the WhatsApp-import flow — same profile-building
+        pipeline as the interview flow (finalize_analysis), just fed
+        from a parsed chat export instead of a Q&A session.
+        """
 
-            session["messages"],
+        result = self._build_and_save_profile(messages, profile_name)
 
-            communication
+        return {
+            "profile_id": result["profile_id"],
+            "profile_name": result["profile_name"],
+            "profile": result["profile"],
+        }
 
-        )
+    def _build_and_save_profile(
+        self,
+        messages,
+        profile_name: str = None
+    ):
+        """
+        Shared tail of both profile-creation paths: measured
+        communication stats -> LLM personality inference -> identity
+        prompt -> saved profile document. `messages` is a list of
+        {role, content} dicts — the interview's Q&A history, or a
+        WhatsApp sender's own texts, tagged role="user" either way.
+        """
 
-        messages = [
+        communication = self.communication.analyze(messages)
 
-            {
+        prompt = self.communication.build_llm_prompt(messages, communication)
 
-                "role":"system",
-
-                "content":
-
-                "Return ONLY valid JSON."
-
-            },
-
-            {
-
-                "role":"user",
-
-                "content":prompt
-
-            }
-
+        llm_messages = [
+            {"role": "system", "content": "Return ONLY valid JSON."},
+            {"role": "user", "content": prompt},
         ]
 
-        personality = self.ollama.chat(
+        personality = self.ollama.chat(llm_messages, temperature=0.2)
 
-            messages,
-
-            temperature=0.2
-
-        )
-
-        parsed = self.parse_llm_response(
-
-            personality
-
-        )
-
-        
+        parsed = self.parse_llm_response(personality)
 
         extracted_name = (parsed.get("name") or "").strip()
-
         final_name = (profile_name or "").strip() or extracted_name or "My Twin"
 
-        identity_prompt = self.build_identity_prompt(
+        identity_prompt = self.build_identity_prompt(communication, parsed)
 
-            communication,
-
-            parsed
-
-        )
-
-        profile = self.merge_profile(
-
-            communication,
-
-            parsed,
-
-            identity_prompt
-
-        )
-
-        session["communication"] = communication
-
-        session["personality"] = profile
+        profile = self.merge_profile(communication, parsed, identity_prompt)
 
         # Generate unique profile ID (full hex/uuid)
         profile_id = str(uuid.uuid4())
@@ -805,7 +793,7 @@ Rules
 
         try:
             # 1. Save the profile document: personality profile + metadata +
-            # the verbatim interview transcript (the person's raw source
+            # the verbatim source transcript (the person's raw source
             # material — separate from `profile` (derived traits) and the
             # conversations collection (the twin's own future chat log) —
             # used to ground the twin's voice in how the real person
@@ -818,7 +806,7 @@ Rules
                     "last_used": now,
                     "version": 1,
                     "profile": profile,
-                    "conversation": session["messages"],
+                    "conversation": messages,
                 }
             )
 
@@ -836,11 +824,11 @@ Rules
         except Exception as e:
             raise RuntimeError(f"Failed to create profile: {e}")
 
-        # Return a dict containing the profile and the newly generated ID
         return {
             "profile_id": profile_id,
             "profile_name": final_name,
-            "profile": profile
+            "profile": profile,
+            "communication": communication,
         }
 
 
