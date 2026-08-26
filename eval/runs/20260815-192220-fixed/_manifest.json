@@ -1,0 +1,29 @@
+{
+  "collected_at": "2026-08-15T19:34:38.709144",
+  "api": "http://localhost:8000/api",
+  "profiles": [
+    "83360df2-b18f-4ffc-9c89-6794661f8ba4"
+  ],
+  "sessions_per_profile": 3,
+  "style_probes": [
+    "hey what's up",
+    "how was your day",
+    "i'm kinda stressed about exams",
+    "what are you up to this weekend",
+    "do you think i should take that internship",
+    "lol that's so random",
+    "tell me something interesting",
+    "i'm bored",
+    "what do you do when you can't sleep",
+    "my friend is being annoying",
+    "any good movie recommendations",
+    "ok i gotta go, talk later"
+  ],
+  "voice_config": {
+    "enabled": true,
+    "public_key": "600b351b-c5a4-48a7-98e3-bc27b4b91f4e",
+    "llm_provider": "vapi-native",
+    "reason": ""
+  },
+  "note": "Record CPU/GPU, RAM and OLLAMA_MODEL manually in the paper's setup section."
+}

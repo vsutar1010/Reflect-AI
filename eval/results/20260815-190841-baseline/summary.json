@@ -1,0 +1,16 @@
+{
+  "run": "20260815-190841-baseline",
+  "n_profiles": 1,
+  "style_similarity_mean": 0.569,
+  "style_similarity_sd": null,
+  "cross_diagonal_dominance_rate": 1.0,
+  "cross_mean_diagonal": 0.569,
+  "cross_mean_offdiagonal": null,
+  "cross_margin": null,
+  "consistency_mean": 0.8002,
+  "consistency_sd": null,
+  "latency_mean_s": 8.485,
+  "latency_median_s": 8.615,
+  "context_recall_rate": 0.0,
+  "context_probes": 3
+}

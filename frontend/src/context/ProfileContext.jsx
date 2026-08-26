@@ -1,9 +1,11 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { api } from '../services/api';
+import { useAuth } from './AuthContext';
 
 const ProfileContext = createContext(null);
 
 export function ProfileProvider({ children }) {
+  const { user, authLoading } = useAuth();
   const [profiles, setProfiles] = useState([]);
   const [selectedProfile, setSelectedProfile] = useState(() => {
     try {
@@ -47,8 +49,17 @@ export function ProfileProvider({ children }) {
   }, [selectedProfile]);
 
   useEffect(() => {
-    fetchProfiles();
-  }, []);
+    if (authLoading) return;
+
+    if (user) {
+      fetchProfiles();
+    } else {
+      setProfiles([]);
+      setSelectedProfile(null);
+      localStorage.removeItem('reflect_active_profile');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, authLoading]);
 
   const selectProfile = (profile) => {
     setSelectedProfile(profile);

@@ -19,11 +19,12 @@ import json
 import time
 import uuid
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 
 from app.config import VAPI_PUBLIC_KEY, VAPI_LLM_PROVIDER, VAPI_SECRET_HEADER, voice_status
-from app.dependencies import voice_chat_service
+from app.database import profiles_collection
+from app.dependencies import get_current_user, voice_chat_service
 from app.schemas import (
     EndVoiceSessionRequest,
     StartVoiceSessionRequest,
@@ -49,13 +50,16 @@ def get_voice_config():
 
 
 @router.post("/start", response_model=StartVoiceSessionResponse)
-def start_voice_session(req: StartVoiceSessionRequest):
+def start_voice_session(req: StartVoiceSessionRequest, current_user: dict = Depends(get_current_user)):
     enabled, reason = voice_status()
     if not enabled:
         raise HTTPException(status_code=503, detail=reason)
 
+    if not profiles_collection.find_one({"_id": req.profile_id, "owner_id": current_user["id"]}, {"_id": 1}):
+        raise HTTPException(status_code=404, detail="Profile not found")
+
     try:
-        result = voice_chat_service.start_session(req.profile_id)
+        result = voice_chat_service.start_session(req.profile_id, current_user["id"])
         return StartVoiceSessionResponse(
             session_id=result["session_id"],
             public_key=VAPI_PUBLIC_KEY,
@@ -67,8 +71,16 @@ def start_voice_session(req: StartVoiceSessionRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+def _owned_voice_session_or_404(session_id: str, owner_id: str) -> dict:
+    session = voice_chat_service.get_session(session_id)
+    if session is None or session.get("owner_id") != owner_id:
+        raise HTTPException(status_code=404, detail="Voice session not found")
+    return session
+
+
 @router.post("/end", response_model=VoiceSessionStatusResponse)
-def end_voice_session(req: EndVoiceSessionRequest):
+def end_voice_session(req: EndVoiceSessionRequest, current_user: dict = Depends(get_current_user)):
+    _owned_voice_session_or_404(req.session_id, current_user["id"])
     try:
         result = voice_chat_service.end_session(req.session_id)
         return VoiceSessionStatusResponse(**result)
@@ -79,10 +91,8 @@ def end_voice_session(req: EndVoiceSessionRequest):
 
 
 @router.get("/session/{session_id}", response_model=VoiceSessionStatusResponse)
-def get_voice_session_status(session_id: str):
-    session = voice_chat_service.get_session(session_id)
-    if session is None:
-        raise HTTPException(status_code=404, detail="Voice session not found")
+def get_voice_session_status(session_id: str, current_user: dict = Depends(get_current_user)):
+    session = _owned_voice_session_or_404(session_id, current_user["id"])
 
     duration = (session.get("ended_at") or time.time()) - session["started_at"]
     return VoiceSessionStatusResponse(

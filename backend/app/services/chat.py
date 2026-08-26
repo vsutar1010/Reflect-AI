@@ -26,13 +26,14 @@ class TextChatService:
     # Session Management
     # ============================================================
 
-    def create_session(self, session_id: str, profile_id: str) -> str:
+    def create_session(self, session_id: str, profile_id: str, owner_id: str) -> str:
         context = self.engine.build_twin_context(profile_id)
         system_messages = ollama_adapter.build_messages(context)
         history = self.engine.load_history(profile_id)
 
         self.sessions[session_id] = {
             "profile_id": profile_id,
+            "owner_id": owner_id,
             "system_messages": system_messages,
             "history": history,
         }

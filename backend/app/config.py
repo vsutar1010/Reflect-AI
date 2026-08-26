@@ -39,6 +39,59 @@ MONGODB_URI = os.environ.get("MONGODB_URI", "")
 MONGODB_DB_NAME = os.environ.get("MONGODB_DB_NAME", "reflectai")
 
 # ==========================================================
+# Authentication
+# ==========================================================
+# Signs/verifies the session JWT stored in an httpOnly cookie. Required —
+# unlike the other config below, there is no safe default for a secret.
+JWT_SECRET = os.environ.get("JWT_SECRET", "")
+if not JWT_SECRET:
+    raise RuntimeError(
+        "JWT_SECRET is not set. Add it to backend/.env — any long random "
+        "string works (e.g. `python -c \"import secrets; print(secrets.token_hex(32))\"`)."
+    )
+
+JWT_ALGORITHM = "HS256"
+JWT_EXPIRE_DAYS = int(os.environ.get("JWT_EXPIRE_DAYS", "14"))
+
+SESSION_COOKIE_NAME = "reflectai_session"
+
+# Verifies "Sign in with Google" ID tokens (see app/services/auth_service.py).
+# Create a Google Cloud OAuth "Web application" Client ID and set the same
+# value here and as VITE_GOOGLE_CLIENT_ID in frontend/.env. Leave blank to
+# disable Google Sign-In — email/password auth works without it.
+GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "")
+
+# The frontend origin allowed to make credentialed (cookie-carrying) requests
+# to this API. Browsers reject a wildcard ("*") combined with credentials, so
+# this must be an explicit origin — the Vite dev server's by default.
+FRONTEND_ORIGIN = os.environ.get("FRONTEND_ORIGIN", "http://localhost:5173")
+
+# Whether the session cookie requires HTTPS. Keep False for local http
+# development; set True once the app is served over https in production.
+COOKIE_SECURE = _bool(os.environ.get("COOKIE_SECURE"), default=False)
+
+# ==========================================================
+# Email (signup OTP verification)
+# ==========================================================
+# Proves the signup email address is actually reachable by whoever is
+# signing up. Not required at import time like JWT_SECRET — the app still
+# boots and existing users can still log in without this configured, only
+# new signups need it (see app/services/email_service.py).
+SMTP_HOST = os.environ.get("SMTP_HOST", "smtp.gmail.com")
+SMTP_PORT = int(os.environ.get("SMTP_PORT", "587"))
+SMTP_USERNAME = os.environ.get("SMTP_USERNAME", "")
+SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD", "")
+SMTP_FROM_NAME = os.environ.get("SMTP_FROM_NAME", "ReflectAI")
+
+OTP_EXPIRE_MINUTES = int(os.environ.get("OTP_EXPIRE_MINUTES", "10"))
+OTP_RESEND_COOLDOWN_SECONDS = int(os.environ.get("OTP_RESEND_COOLDOWN_SECONDS", "60"))
+OTP_MAX_ATTEMPTS = int(os.environ.get("OTP_MAX_ATTEMPTS", "5"))
+
+
+def smtp_configured() -> bool:
+    return bool(SMTP_USERNAME and SMTP_PASSWORD)
+
+# ==========================================================
 # Public backend URL
 # ==========================================================
 # Vapi is a cloud service — it cannot reach "localhost". To let Vapi call

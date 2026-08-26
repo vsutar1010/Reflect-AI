@@ -1,7 +1,11 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { AuthProvider } from './context/AuthContext';
 import { ProfileProvider } from './context/ProfileContext';
+import ProtectedRoute from './components/common/ProtectedRoute';
 import Landing from './pages/Landing';
+import Login from './pages/Login';
+import Signup from './pages/Signup';
 import Analyze from './pages/Analyze';
 import Dashboard from './pages/Dashboard';
 import Reflect from './pages/Reflect';
@@ -12,19 +16,23 @@ import Profiles from './pages/Profiles';
 
 export default function App() {
   return (
-    <ProfileProvider>
-      <Router>
-        <Routes>
-          <Route path="/" element={<Landing />} />
-          <Route path="/analyze" element={<Analyze />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/reflect" element={<Reflect />} />
-          <Route path="/mode" element={<ModeSelect />} />
-          <Route path="/chat" element={<Chat />} />
-          <Route path="/voice" element={<Voice />} />
-          <Route path="/profiles" element={<Profiles />} />
-        </Routes>
-      </Router>
-    </ProfileProvider>
+    <AuthProvider>
+      <ProfileProvider>
+        <Router>
+          <Routes>
+            <Route path="/" element={<Landing />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/signup" element={<Signup />} />
+            <Route path="/analyze" element={<ProtectedRoute><Analyze /></ProtectedRoute>} />
+            <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+            <Route path="/reflect" element={<ProtectedRoute><Reflect /></ProtectedRoute>} />
+            <Route path="/mode" element={<ProtectedRoute><ModeSelect /></ProtectedRoute>} />
+            <Route path="/chat" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
+            <Route path="/voice" element={<ProtectedRoute><Voice /></ProtectedRoute>} />
+            <Route path="/profiles" element={<ProtectedRoute><Profiles /></ProtectedRoute>} />
+          </Routes>
+        </Router>
+      </ProfileProvider>
+    </AuthProvider>
   );
 }

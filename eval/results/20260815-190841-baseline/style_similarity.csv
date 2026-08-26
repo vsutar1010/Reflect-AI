@@ -1,0 +1,2 @@
+label,profile_id,sss,vocab_jaccard,avg_sentence_len,avg_response_len,lexical_diversity,emoji_rate,question_rate,exclaim_rate,comma_rate,period_rate,lowercase_ratio,filler_rate,shortform_rate,greeting_rate
+VS,83360df2-b18f-4ffc-9c89-6794661f8ba4,0.569,0.1364,0.5708,0.2336,0.9203,0.147,0.0,0.9128,0.9893,0.8657,0.9467,0.6819,0.0,0.5592

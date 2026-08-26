@@ -15,6 +15,7 @@ async function handleResponse(res) {
 
 async function fetchJSON(endpoint, options = {}) {
   const res = await fetch(`${API_BASE}${endpoint}`, {
+    credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
       ...options.headers,
@@ -26,6 +27,18 @@ async function fetchJSON(endpoint, options = {}) {
 }
 
 export const api = {
+  // Auth
+  requestSignupOtp: ({ email, password, name }) =>
+    fetchJSON('/auth/signup/request-otp', { method: 'POST', body: JSON.stringify({ email, password, name }) }),
+  verifySignupOtp: ({ email, otp }) =>
+    fetchJSON('/auth/signup/verify-otp', { method: 'POST', body: JSON.stringify({ email, otp }) }),
+  login: ({ email, password }) =>
+    fetchJSON('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
+  loginWithGoogle: (credential) =>
+    fetchJSON('/auth/google', { method: 'POST', body: JSON.stringify({ credential }) }),
+  logout: () => fetchJSON('/auth/logout', { method: 'POST' }),
+  me: () => fetchJSON('/auth/me'),
+
   // Profiles
   getProfiles: () => fetchJSON('/profiles'),
   getProfile: (id) => fetchJSON(`/profiles/${id}`),
@@ -56,6 +69,7 @@ export const api = {
     formData.append('file', file);
     return fetch(`${API_BASE}/analyze/whatsapp/upload`, {
       method: 'POST',
+      credentials: 'include',
       body: formData,
     }).then(handleResponse);
   },

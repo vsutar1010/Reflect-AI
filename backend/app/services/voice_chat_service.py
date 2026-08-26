@@ -75,7 +75,7 @@ class VoiceChatService:
     # Call Lifecycle
     # ============================================================
 
-    def start_session(self, profile_id: str) -> dict:
+    def start_session(self, profile_id: str, owner_id: str) -> dict:
         session_id = str(uuid.uuid4())
 
         context = self.engine.build_twin_context(profile_id)
@@ -85,6 +85,7 @@ class VoiceChatService:
 
         self.sessions[session_id] = {
             "profile_id": profile_id,
+            "owner_id": owner_id,
             "context": context,
             "history": history,
             "status": "created",

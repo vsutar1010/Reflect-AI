@@ -111,11 +111,13 @@ class PersonalityAnalyzer:
     # Session
     # ============================================================
 
-    def create_session(self):
+    def create_session(self, owner_id: str):
 
         session_id = str(uuid.uuid4())
 
         self.sessions[session_id] = {
+
+            "owner_id": owner_id,
 
             "created_at": datetime.now(),
 
@@ -175,9 +177,9 @@ class PersonalityAnalyzer:
     # Analysis
     # ============================================================
 
-    def start_analysis(self):
+    def start_analysis(self, owner_id: str):
 
-        session_id = self.create_session()
+        session_id = self.create_session(owner_id)
         print("[START]")
         print("Analyzer instance:", id(self))
         print("Created session:", session_id)
@@ -721,7 +723,7 @@ Rules
 
         session = self.get_session(session_id)
 
-        result = self._build_and_save_profile(session["messages"], profile_name)
+        result = self._build_and_save_profile(session["messages"], profile_name, session["owner_id"])
 
         # Kept on the session for get_personality()/get_communication()/
         # export_session() — not used by the WhatsApp import path, which
@@ -738,7 +740,8 @@ Rules
     def analyze_whatsapp_messages(
         self,
         messages,
-        profile_name: str = None
+        profile_name: str = None,
+        owner_id: str = None
     ):
         """
         Entry point for the WhatsApp-import flow — same profile-building
@@ -746,7 +749,7 @@ Rules
         from a parsed chat export instead of a Q&A session.
         """
 
-        result = self._build_and_save_profile(messages, profile_name)
+        result = self._build_and_save_profile(messages, profile_name, owner_id)
 
         return {
             "profile_id": result["profile_id"],
@@ -757,7 +760,8 @@ Rules
     def _build_and_save_profile(
         self,
         messages,
-        profile_name: str = None
+        profile_name: str = None,
+        owner_id: str = None
     ):
         """
         Shared tail of both profile-creation paths: measured
@@ -801,6 +805,7 @@ Rules
             profiles_collection.insert_one(
                 {
                     "_id": profile_id,
+                    "owner_id": owner_id,
                     "name": final_name,
                     "created_at": now,
                     "last_used": now,

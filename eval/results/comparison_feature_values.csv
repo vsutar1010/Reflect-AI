@@ -1,0 +1,13 @@
+feature,source_value,baseline_twin,fixed_twin
+avg_sentence_len,17.15,6.85,11.02
+avg_response_len,116.6,15.42,56.92
+lexical_diversity,0.358,0.42,0.264
+emoji_rate,0.9434,11.8919,5.8077
+question_rate,0.0,0.3086,0.2796
+exclaim_rate,0.0147,0.0123,0.0161
+comma_rate,9.3482,9.5495,8.5408
+period_rate,0.9706,0.7407,0.6989
+lowercase_ratio,0.89,0.8,0.87
+filler_rate,2.1441,4.1441,1.9522
+shortform_rate,0.0,0.7207,0.0488
+greeting_rate,4.5455,11.7117,8.6872

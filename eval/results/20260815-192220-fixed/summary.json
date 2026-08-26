@@ -1,0 +1,16 @@
+{
+  "run": "20260815-192220-fixed",
+  "n_profiles": 1,
+  "style_similarity_mean": 0.6618,
+  "style_similarity_sd": null,
+  "cross_diagonal_dominance_rate": 1.0,
+  "cross_mean_diagonal": 0.6618,
+  "cross_mean_offdiagonal": null,
+  "cross_margin": null,
+  "consistency_mean": 0.7471,
+  "consistency_sd": null,
+  "latency_mean_s": 11.055,
+  "latency_median_s": 10.254,
+  "context_recall_rate": 0.0,
+  "context_probes": 3
+}

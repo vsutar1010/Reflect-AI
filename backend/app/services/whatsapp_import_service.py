@@ -23,13 +23,14 @@ class WhatsAppImportService:
         self.parser = WhatsAppParser()
         self.pending: Dict[str, dict] = {}
 
-    def create_upload(self, raw_text: str) -> dict:
+    def create_upload(self, raw_text: str, owner_id: str) -> dict:
         records = self.parser.parse(raw_text)
         participants = self.parser.detect_participants(records)
         self.parser.validate_one_on_one(participants)
 
         upload_id = str(uuid.uuid4())
         self.pending[upload_id] = {
+            "owner_id": owner_id,
             "records": records,
             "participants": participants,
             "created_at": datetime.now(),
@@ -54,9 +55,10 @@ class WhatsAppImportService:
         target_sender: str,
         profile_name: Optional[str],
         analyzer,
+        owner_id: str,
     ) -> dict:
         pending = self.pending.get(upload_id)
-        if not pending:
+        if not pending or pending["owner_id"] != owner_id:
             raise ValueError("Upload not found or expired — please upload the chat again.")
 
         known_senders = {p["name"] for p in pending["participants"]}
@@ -65,7 +67,7 @@ class WhatsAppImportService:
 
         messages = self.parser.build_target_messages(pending["records"], target_sender)
 
-        return analyzer.analyze_whatsapp_messages(messages, profile_name)
+        return analyzer.analyze_whatsapp_messages(messages, profile_name, owner_id)
 
     def discard(self, upload_id: str) -> None:
         self.pending.pop(upload_id, None)

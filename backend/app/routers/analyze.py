@@ -1,6 +1,6 @@
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 
-from app.dependencies import analyzer, whatsapp_import_service
+from app.dependencies import analyzer, get_current_user, whatsapp_import_service
 from app.schemas import (
     AnalysisMessageRequest,
     AnalysisMessageResponse,
@@ -16,20 +16,26 @@ router = APIRouter(prefix="/api/analyze", tags=["analyze"])
 _MAX_UPLOAD_BYTES = 15 * 1024 * 1024  # 15MB
 
 
+def _owned_session_or_404(session_id: str, owner_id: str):
+    session = analyzer.get_session(session_id)
+    if session is None or session.get("owner_id") != owner_id:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return session
+
+
 @router.post("/start", response_model=StartAnalysisResponse)
-def start_analysis():
+def start_analysis(current_user: dict = Depends(get_current_user)):
     try:
-        res = analyzer.start_analysis()
+        res = analyzer.start_analysis(current_user["id"])
         return StartAnalysisResponse(session_id=res["session_id"], message=res["question"])
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/message", response_model=AnalysisMessageResponse)
-def send_analysis_message(req: AnalysisMessageRequest):
+def send_analysis_message(req: AnalysisMessageRequest, current_user: dict = Depends(get_current_user)):
     session_id = req.session_id
-    if not analyzer.session_exists(session_id):
-        raise HTTPException(status_code=404, detail="Session not found")
+    _owned_session_or_404(session_id, current_user["id"])
 
     try:
         res = analyzer.continue_analysis(session_id, req.message)
@@ -53,10 +59,9 @@ def send_analysis_message(req: AnalysisMessageRequest):
 
 
 @router.post("/finalize")
-def finalize_analysis(req: FinalizeAnalysisRequest):
+def finalize_analysis(req: FinalizeAnalysisRequest, current_user: dict = Depends(get_current_user)):
     session_id = req.session_id
-    if not analyzer.session_exists(session_id):
-        raise HTTPException(status_code=404, detail="Session not found")
+    _owned_session_or_404(session_id, current_user["id"])
 
     try:
         res = analyzer.finalize_analysis(session_id, req.profile_name)
@@ -73,7 +78,7 @@ def finalize_analysis(req: FinalizeAnalysisRequest):
 # ==========================================================
 
 @router.post("/whatsapp/upload", response_model=WhatsAppUploadResponse)
-async def upload_whatsapp_chat(file: UploadFile = File(...)):
+async def upload_whatsapp_chat(file: UploadFile = File(...), current_user: dict = Depends(get_current_user)):
     if not (file.filename or "").lower().endswith(".txt"):
         raise HTTPException(status_code=400, detail="Please upload a WhatsApp chat export (.txt).")
 
@@ -87,14 +92,14 @@ async def upload_whatsapp_chat(file: UploadFile = File(...)):
         text = raw_bytes.decode("utf-8", errors="replace")
 
     try:
-        res = whatsapp_import_service.create_upload(text)
+        res = whatsapp_import_service.create_upload(text, current_user["id"])
         return WhatsAppUploadResponse(**res)
     except WhatsAppParseError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.post("/whatsapp/finalize")
-def finalize_whatsapp_chat(req: WhatsAppFinalizeRequest):
+def finalize_whatsapp_chat(req: WhatsAppFinalizeRequest, current_user: dict = Depends(get_current_user)):
     # No explicit name given — default to the WhatsApp sender's own
     # display name rather than relying on the LLM spotting a
     # self-mention, which rarely happens in casual chat.
@@ -102,7 +107,7 @@ def finalize_whatsapp_chat(req: WhatsAppFinalizeRequest):
 
     try:
         res = whatsapp_import_service.finalize_upload(
-            req.upload_id, req.target_sender, profile_name, analyzer
+            req.upload_id, req.target_sender, profile_name, analyzer, current_user["id"]
         )
         whatsapp_import_service.discard(req.upload_id)
         return res

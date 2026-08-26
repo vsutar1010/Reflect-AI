@@ -4,7 +4,37 @@ Pydantic schemas for ReflectAI API.
 
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, EmailStr, Field
+
+
+# ==========================================================
+# Auth API
+# ==========================================================
+
+class SignupRequest(BaseModel):
+    email: EmailStr
+    password: str = Field(..., min_length=8)
+    name: str = Field(..., min_length=1)
+
+
+class VerifyOtpRequest(BaseModel):
+    email: EmailStr
+    otp: str = Field(..., min_length=6, max_length=6)
+
+
+class LoginRequest(BaseModel):
+    email: EmailStr
+    password: str
+
+
+class GoogleAuthRequest(BaseModel):
+    credential: str
+
+
+class UserResponse(BaseModel):
+    id: str
+    email: str
+    name: str
 
 
 # ==========================================================

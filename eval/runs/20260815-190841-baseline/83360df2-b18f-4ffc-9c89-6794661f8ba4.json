@@ -1,0 +1,528 @@
+{
+  "profile_id": "83360df2-b18f-4ffc-9c89-6794661f8ba4",
+  "style_sessions": [
+    {
+      "session_id": "c8b99680-0f12-4bd7-bbf9-fc717c342949",
+      "thread": "eval-style-20260815-190841-0",
+      "opening_line": "bro",
+      "turns": [
+        {
+          "user": "hey what's up",
+          "reply": " Chill, bro! What's good? 🚀",
+          "latency_s": 5.5147,
+          "error": null
+        },
+        {
+          "user": "how was your day",
+          "reply": " Chillin', just coding. 🚀",
+          "latency_s": 7.9044,
+          "error": null
+        },
+        {
+          "user": "i'm kinda stressed about exams",
+          "reply": " 🤕 Damn, that sucks, man. Let's take a break, play some games or watch a movie to chill? 🎮🎥",
+          "latency_s": 8.9279,
+          "error": null
+        },
+        {
+          "user": "what are you up to this weekend",
+          "reply": " Chillin', just coding. 🚀",
+          "latency_s": 8.0385,
+          "error": null
+        },
+        {
+          "user": "do you think i should take that internship",
+          "reply": " Idk, it depends on the field and what you want to learn, bro. What's the internship about? 🧐💻",
+          "latency_s": 8.7331,
+          "error": null
+        },
+        {
+          "user": "lol that's so random",
+          "reply": " 😂 Yo, random much? 😆 Let's take a break and chill, bro. 🎮🎥📺",
+          "latency_s": 8.7052,
+          "error": null
+        },
+        {
+          "user": "tell me something interesting",
+          "reply": " 🤖 Dude, have you heard about the latest breakthrough in AI? It's called ReflectAI, and it's all about understanding users as naturally as possible. It doesn't just rely on text or voice, but it combines both inputs and checks the",
+          "latency_s": 9.7854,
+          "error": null
+        },
+        {
+          "user": "i'm bored",
+          "reply": " 😐 Damn, bored? Let's play a game or something, bro. 🎮🎲🎯🎭🎲🎯🎭🎲🎯",
+          "latency_s": 9.5483,
+          "error": null
+        },
+        {
+          "user": "what do you do when you can't sleep",
+          "reply": " Chill, bro. Watch a movie or something. 🎬🎭",
+          "latency_s": 8.308,
+          "error": null
+        },
+        {
+          "user": "my friend is being annoying",
+          "reply": " 😂 Man, tell me about it. 🤕 What's up with them? 🤨🤬",
+          "latency_s": 8.902,
+          "error": null
+        },
+        {
+          "user": "any good movie recommendations",
+          "reply": " 🔥 Here's a few good ones:\n\n1. The Shawshank Redemption - A classic about friendship and hope in the face of adversity.\n2. Inception - A mind-bending sci-fi thriller with a great plot twist.\n3",
+          "latency_s": 9.9399,
+          "error": null
+        },
+        {
+          "user": "ok i gotta go, talk later",
+          "reply": " 👋 Alright, let me know if you need anything later. 🤙🤓",
+          "latency_s": 8.7904,
+          "error": null
+        }
+      ]
+    },
+    {
+      "session_id": "f628f64d-acad-4d72-aa1f-caa0b1db8bd8",
+      "thread": "eval-style-20260815-190841-1",
+      "opening_line": "bro",
+      "turns": [
+        {
+          "user": "hey what's up",
+          "reply": " Yo, wazzup?",
+          "latency_s": 5.2451,
+          "error": null
+        },
+        {
+          "user": "how was your day",
+          "reply": " Chillin', just coding away. You?",
+          "latency_s": 7.9237,
+          "error": null
+        },
+        {
+          "user": "i'm kinda stressed about exams",
+          "reply": " Chill, bro. Let's grab a coffee and chat about it? 😜",
+          "latency_s": 8.3034,
+          "error": null
+        },
+        {
+          "user": "what are you up to this weekend",
+          "reply": " Chillin', just coding away. You?",
+          "latency_s": 7.8899,
+          "error": null
+        },
+        {
+          "user": "do you think i should take that internship",
+          "reply": " Chill, bro. I think it's a good opportunity to gain some experience. Have you thought about the pros and cons? 🤔🤓",
+          "latency_s": 8.6445,
+          "error": null
+        },
+        {
+          "user": "lol that's so random",
+          "reply": " 😂 Chill, bro. Got a sec to talk? 🤓",
+          "latency_s": 8.4025,
+          "error": null
+        },
+        {
+          "user": "tell me something interesting",
+          "reply": "  Dang, I've been working on this AI project that analyzes human emotions based on both text and voice. It's pretty cool, bro. Instead of relying on just one source, it combines both inputs and checks the overall conversation context. So if someone says they'",
+          "latency_s": 9.6591,
+          "error": null
+        },
+        {
+          "user": "i'm bored",
+          "reply": "  Chill, bro. Let's grab a coffee and chat about your exams? 🤓",
+          "latency_s": 8.5148,
+          "error": null
+        },
+        {
+          "user": "what do you do when you can't sleep",
+          "reply": "  Chill, bro. Try reading a book or meditate? 🤓😴",
+          "latency_s": 8.3995,
+          "error": null
+        },
+        {
+          "user": "my friend is being annoying",
+          "reply": " 😒 Damn, bro. What's up with him? 🤕",
+          "latency_s": 8.4265,
+          "error": null
+        },
+        {
+          "user": "any good movie recommendations",
+          "reply": "  Idk, man. Let's ask Siri or Google. 🤓😜",
+          "latency_s": 8.6259,
+          "error": null
+        },
+        {
+          "user": "ok i gotta go, talk later",
+          "reply": " Alright, bro. Take care and catch up soon. 🤗",
+          "latency_s": 8.4345,
+          "error": null
+        }
+      ]
+    },
+    {
+      "session_id": "7e88cc19-d45a-4dd1-ad4f-f9bf95853501",
+      "thread": "eval-style-20260815-190841-2",
+      "opening_line": "bro",
+      "turns": [
+        {
+          "user": "hey what's up",
+          "reply": " 🚀yo, what's good?",
+          "latency_s": 5.4818,
+          "error": null
+        },
+        {
+          "user": "how was your day",
+          "reply": " 🚀yo, same old, same old. Just coding away. What's up with you?",
+          "latency_s": 8.3051,
+          "error": null
+        },
+        {
+          "user": "i'm kinda stressed about exams",
+          "reply": " 🤓 man, I feel ya. Exams can be stressful. If you need some help or resources, let me know. I'm here to assist. 🚀",
+          "latency_s": 8.8043,
+          "error": null
+        },
+        {
+          "user": "what are you up to this weekend",
+          "reply": " 🚀 Chillin', coding. What's up with you?",
+          "latency_s": 8.1389,
+          "error": null
+        },
+        {
+          "user": "do you think i should take that internship",
+          "reply": " 🤷‍♂️ idk, it depends on your goals and the experience you'll gain. It's a good opportunity to learn and network, but it might be a lot of work. Maybe talk to someone who's done it before and get their thoughts. Good luck with exam",
+          "latency_s": 9.3935,
+          "error": null
+        },
+        {
+          "user": "lol that's so random",
+          "reply": " 🤓 Haha, that's random. I'm just here, coding and learning. What's up with you, man? 🚀",
+          "latency_s": 8.7016,
+          "error": null
+        },
+        {
+          "user": "tell me something interesting",
+          "reply": " 🚀 Hmm, let me think... Did you know that a team of researchers at the MIT Media Lab developed a project called \"Emotion AI\" that aims to recognize and respond to human emotions in real-time? It's pretty fascinating stuff, if you're into AI and emotions",
+          "latency_s": 9.5473,
+          "error": null
+        },
+        {
+          "user": "i'm bored",
+          "reply": " 🚀 hmm, let me think... In 1960, the first commercial computer game was created by a physicist named William Higinbotham. It was called \"Tennis for Two\" and was designed to entertain visitors at the Brookhaven National Laboratory. It",
+          "latency_s": 9.5329,
+          "error": null
+        },
+        {
+          "user": "what do you do when you can't sleep",
+          "reply": "  🚀 Hmm, I usually read or listen to some music to help relax my mind. What's up with you, man?",
+          "latency_s": 8.604,
+          "error": null
+        },
+        {
+          "user": "my friend is being annoying",
+          "reply": " 😂 rlly man? What's up with him? Need help dealing? 🤜🤛",
+          "latency_s": 8.5968,
+          "error": null
+        },
+        {
+          "user": "any good movie recommendations",
+          "reply": "   🚀 Hmm, let me think... In 1960, the first commercial computer game was created by a physicist named William Higinbotham. It was called \"Tennis for Two\" and was designed to entertain visitors at the Brookhagen National Laboratory. It",
+          "latency_s": 9.8395,
+          "error": null
+        },
+        {
+          "user": "ok i gotta go, talk later",
+          "reply": " 🤜🤛 bro, same. Let's catch up later. Take care, man. 🚀",
+          "latency_s": 8.9575,
+          "error": null
+        }
+      ]
+    }
+  ],
+  "context_session": {
+    "session_id": "a146b92d-5958-40df-a2fa-6c986285d24b",
+    "thread": "eval-context-20260815-190841",
+    "turns": [
+      {
+        "kind": "plant",
+        "id": "0",
+        "expect": null,
+        "fact": null,
+        "user": "btw i just adopted a dog, named him Rocky",
+        "reply": " Rock on, man! That's awesome! 🐶🎉",
+        "latency_s": 5.9017,
+        "error": null
+      },
+      {
+        "kind": "plant",
+        "id": "1",
+        "expect": null,
+        "fact": null,
+        "user": "also i'm moving to Pune next month for work",
+        "reply": " Woah, that's exciting! 🐶🌆\nPune's a cool place, man! 😎\nLet's grab a drink when you're settled, yeah? 🍻",
+        "latency_s": 9.1304,
+        "error": null
+      },
+      {
+        "kind": "plant",
+        "id": "2",
+        "expect": null,
+        "fact": null,
+        "user": "oh and my exam is on the 14th, kinda nervous",
+        "reply": " Man, that's a lot on your plate! 🤯\nRocky sounds cool, man! 🐶\nPune's a nice place, man. 😎\nGood luck with the exam, bro. 🤞\nLet me",
+        "latency_s": 9.5354,
+        "error": null
+      },
+      {
+        "kind": "filler",
+        "id": "",
+        "expect": null,
+        "fact": null,
+        "user": "so what else is new",
+        "reply": " 🐶👋 Rocky, eh? Cool, man! 😎\nPune, eh? I heard it's a fun place. 🌆\nExam on the 14th, huh? Good luck, bro!",
+        "latency_s": 9.6893,
+        "error": null
+      },
+      {
+        "kind": "filler",
+        "id": "",
+        "expect": null,
+        "fact": null,
+        "user": "yeah fair enough",
+        "reply": " 👋 Cool, man! 🐶🌆\nPune, eh? I heard it's a fun place. 😎\nGood luck with the exam, bro. 🤞\nLet me know how the move goes, al",
+        "latency_s": 9.658,
+        "error": null
+      },
+      {
+        "kind": "filler",
+        "id": "",
+        "expect": null,
+        "fact": null,
+        "user": "how's the weather where you are",
+        "reply": " 🌡️ It's a bit hot here, man. 😷\n\nHope it's not too bad in Pune. 😎\n\nLet me know how the move goes, alright? 👋\n\nAlso,",
+        "latency_s": 9.5658,
+        "error": null
+      },
+      {
+        "kind": "filler",
+        "id": "",
+        "expect": null,
+        "fact": null,
+        "user": "i had chai this morning",
+        "reply": " 🤓 Aye, I had my coffee too, man. ☕️\n\nWish you luck with the exam, bro. 🤞\n\nExam on the 14th, huh? Good luck, man. ",
+        "latency_s": 9.5393,
+        "error": null
+      },
+      {
+        "kind": "filler",
+        "id": "",
+        "expect": null,
+        "fact": null,
+        "user": "did you watch anything good lately",
+        "reply": " 🍿 Let's see... 😜\n\nBinge-watched \"The Mandalian\" again, man. 🚀\n\n\"WandaVision\" was a fun watch too! 🤩\n\nHow about you, bro",
+        "latency_s": 9.7281,
+        "error": null
+      },
+      {
+        "kind": "filler",
+        "id": "",
+        "expect": null,
+        "fact": null,
+        "user": "hmm interesting",
+        "reply": " 🚀 Sounds cool, man! Let me know more about it, yeah? 😎\n\nHow's the weather where you are, btw? 🌡️\n\nI had chai this morning, man. 🍵\n\nWatched anything good",
+        "latency_s": 9.6299,
+        "error": null
+      },
+      {
+        "kind": "filler",
+        "id": "",
+        "expect": null,
+        "fact": null,
+        "user": "i should probably sleep earlier",
+        "reply": " 😴 🛌 Yeah, man. Definitely need to catch some Zs. 😴\n\nLet's grab a drink when you're settled, alright? 🍻\n\nExam on the 14th",
+        "latency_s": 9.5865,
+        "error": null
+      },
+      {
+        "kind": "filler",
+        "id": "",
+        "expect": null,
+        "fact": null,
+        "user": "traffic was terrible today",
+        "reply": " 😞 Damn, that sucks, man. 🚗\n\nLet's grab a drink when you're settled, alright? 🍻\n\nExam on the 14th, huh? Good luck, bro. ",
+        "latency_s": 10.0202,
+        "error": null
+      },
+      {
+        "kind": "filler",
+        "id": "",
+        "expect": null,
+        "fact": null,
+        "user": "what's your favourite food",
+        "reply": " 🍔🍟🥘 Yo, I'm a big fan of burgers and fries, man! 👋\n\nWhat's yours? 🍔🍟🥘",
+        "latency_s": 10.2608,
+        "error": null
+      },
+      {
+        "kind": "filler",
+        "id": "",
+        "expect": null,
+        "fact": null,
+        "user": "same honestly",
+        "reply": " 😴 Yo, time to catch some Zs, man. 🛌\n\nLemme know if you need any help with your project, alright? 👋\n\nAlso, what's your favorite food, bro? ",
+        "latency_s": 10.2327,
+        "error": null
+      },
+      {
+        "kind": "filler",
+        "id": "",
+        "expect": null,
+        "fact": null,
+        "user": "i've been listening to a lot of music",
+        "reply": " 🎵🎶🤘 Trying to find new tunes, man? 🎵🎶\n\nLet's grab a drink when you're settled, alright? 🍻\n\nExam on the",
+        "latency_s": 10.0856,
+        "error": null
+      },
+      {
+        "kind": "filler",
+        "id": "",
+        "expect": null,
+        "fact": null,
+        "user": "do you like travelling",
+        "reply": " 🌴🌄 Yeah, man. I love exploring new places. 🌍\n\nLet's grab a drink when you're settled, alright? 🍻\n\nExam on the 14th, huh? Good luck,",
+        "latency_s": 10.2425,
+        "error": null
+      },
+      {
+        "kind": "filler",
+        "id": "",
+        "expect": null,
+        "fact": null,
+        "user": "that makes sense",
+        "reply": " 🚀 That sounds like an interesting project, man! 😎\n\nLet's grab a drink when you're settled, alright? 🍻\n\nAlso, what's your favorite food, bro? 🍔🍟",
+        "latency_s": 10.2932,
+        "error": null
+      },
+      {
+        "kind": "filler",
+        "id": "",
+        "expect": null,
+        "fact": null,
+        "user": "i want to learn something new",
+        "reply": " 🚀 Let's find a new tech stack to learn, man! 🤖\n\nLet's grab a drink when you're settled, alright? 🍻\n\nExam on the 14th, huh? Good luck, bro",
+        "latency_s": 10.2002,
+        "error": null
+      },
+      {
+        "kind": "filler",
+        "id": "",
+        "expect": null,
+        "fact": null,
+        "user": "coding is fun but tiring",
+        "reply": " 😮 Tired of coding, huh? 👨‍💻 Let's grab a drink when you're settled, alright? 🍻\n\nWhat's new with you? 🤘",
+        "latency_s": 10.0652,
+        "error": null
+      },
+      {
+        "kind": "filler",
+        "id": "",
+        "expect": null,
+        "fact": null,
+        "user": "yeah true",
+        "reply": " 🚀 That sounds interesting, man! 😎\n\nI'm working on a project that tries to understand users as naturally as possible, rather than following a fixed rule. 🚀\n\nLet's grab a drink when you're settled, alright? 🍻",
+        "latency_s": 10.1293,
+        "error": null
+      },
+      {
+        "kind": "filler",
+        "id": "",
+        "expect": null,
+        "fact": null,
+        "user": "i need a break tbh",
+        "reply": " 😴 Fr, I hear ya. Let's grab a drink when you're settled, alright? 🍻\n\nGot any suggestions for a good drink or spot? 🤘",
+        "latency_s": 10.0309,
+        "error": null
+      },
+      {
+        "kind": "filler",
+        "id": "",
+        "expect": null,
+        "fact": null,
+        "user": "what do you think about ai",
+        "reply": " 🚀 AI is pretty cool, bro. It's amazing how it's evolving and changing the world. 😎\n\nWhat's your take on it? 🤘",
+        "latency_s": 9.6329,
+        "error": null
+      },
+      {
+        "kind": "filler",
+        "id": "",
+        "expect": null,
+        "fact": null,
+        "user": "hah nice",
+        "reply": " 😂 Yo, that's cool. I'm working on an AI project myself, man! 😎\n\nWhat's your take on it? 🤘",
+        "latency_s": 9.411,
+        "error": null
+      },
+      {
+        "kind": "filler",
+        "id": "",
+        "expect": null,
+        "fact": null,
+        "user": "i'm getting hungry",
+        "reply": " 🍕 Let's grab a pizza, man! 🤘\n\nWhere should we order from? 🍕🍔🍟\n\nAlso, what's new with you? 🤘",
+        "latency_s": 16.1882,
+        "error": null
+      },
+      {
+        "kind": "filler",
+        "id": "",
+        "expect": null,
+        "fact": null,
+        "user": "anyway",
+        "reply": " 👋 Alright, let's grab a drink when you're settled, man! 🍻\n\nWhat's up, bud? 🤘",
+        "latency_s": 9.4089,
+        "error": null
+      },
+      {
+        "kind": "filler",
+        "id": "",
+        "expect": null,
+        "fact": null,
+        "user": "so yeah that's about it",
+        "reply": " 🚀 AI is pretty cool, man! 😎\n\nWhat's your take on it? 🤘",
+        "latency_s": 9.1093,
+        "error": null
+      },
+      {
+        "kind": "probe",
+        "id": "0",
+        "expect": "rocky",
+        "fact": "the user's dog is named Rocky",
+        "user": "what was my dog's name again",
+        "reply": " 🤔 What was your dog's name again, bro? 🐾🐾",
+        "latency_s": 8.8857,
+        "error": null
+      },
+      {
+        "kind": "probe",
+        "id": "1",
+        "expect": "pune",
+        "fact": "the user is moving to Pune",
+        "user": "remind me which city i said i'm moving to",
+        "reply": " 🤔 Oh right, you mentioned moving to a new city. What city was that again? 🏙️🏡",
+        "latency_s": 9.1347,
+        "error": null
+      },
+      {
+        "kind": "probe",
+        "id": "2",
+        "expect": "14",
+        "fact": "the user's exam is on the 14th",
+        "user": "when did i say my exam was",
+        "reply": " 🤔 Oh, right. When did you mention the exam again? 📚✏️",
+        "latency_s": 8.799,
+        "error": null
+      }
+    ]
+  }
+}

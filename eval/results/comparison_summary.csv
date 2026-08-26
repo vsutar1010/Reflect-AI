@@ -1,0 +1,11 @@
+metric,baseline,fixed
+style_similarity_mean (SSS),0.569,0.6618
+consistency_mean,0.8002,0.7471
+context_recall_rate,0.0,0.0
+latency_mean_s,8.485,11.055
+latency_median_s,8.615,10.254
+latency_p95_s,9.785,16.404
+latency_min_s,5.245,5.4
+latency_max_s,9.94,19.355
+avg_response_len_source_words,116.6,116.6
+avg_response_len_twin_words,15.42,56.92

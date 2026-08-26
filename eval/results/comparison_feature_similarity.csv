@@ -1,0 +1,15 @@
+metric,baseline_similarity,fixed_similarity,delta
+SSS_overall,0.569,0.6618,0.0928
+vocab_jaccard,0.1364,0.1905,0.0541
+avg_sentence_len,0.5708,0.7824,0.2116
+avg_response_len,0.2336,0.6561,0.4225
+lexical_diversity,0.9203,0.8489,-0.0714
+emoji_rate,0.147,0.2795,0.1325
+question_rate,0.0,0.0,0.0
+exclaim_rate,0.9128,0.9538,0.041
+comma_rate,0.9893,0.9549,-0.0344
+period_rate,0.8657,0.8373,-0.0284
+lowercase_ratio,0.9467,0.9886,0.0419
+filler_rate,0.6819,0.9531,0.2712
+shortform_rate,0.0,0.0,0.0
+greeting_rate,0.5592,0.687,0.1278

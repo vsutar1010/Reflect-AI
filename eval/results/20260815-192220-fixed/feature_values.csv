@@ -1,0 +1,13 @@
+label,profile_id,feature,source,twin
+VS,83360df2-b18f-4ffc-9c89-6794661f8ba4,avg_sentence_len,17.15,11.02
+VS,83360df2-b18f-4ffc-9c89-6794661f8ba4,avg_response_len,116.6,56.92
+VS,83360df2-b18f-4ffc-9c89-6794661f8ba4,lexical_diversity,0.358,0.264
+VS,83360df2-b18f-4ffc-9c89-6794661f8ba4,emoji_rate,0.9434,5.8077
+VS,83360df2-b18f-4ffc-9c89-6794661f8ba4,question_rate,0.0,0.2796
+VS,83360df2-b18f-4ffc-9c89-6794661f8ba4,exclaim_rate,0.0147,0.0161
+VS,83360df2-b18f-4ffc-9c89-6794661f8ba4,comma_rate,9.3482,8.5408
+VS,83360df2-b18f-4ffc-9c89-6794661f8ba4,period_rate,0.9706,0.6989
+VS,83360df2-b18f-4ffc-9c89-6794661f8ba4,lowercase_ratio,0.89,0.87
+VS,83360df2-b18f-4ffc-9c89-6794661f8ba4,filler_rate,2.1441,1.9522
+VS,83360df2-b18f-4ffc-9c89-6794661f8ba4,shortform_rate,0.0,0.0488
+VS,83360df2-b18f-4ffc-9c89-6794661f8ba4,greeting_rate,4.5455,8.6872

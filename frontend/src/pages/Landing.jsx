@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import Navbar from '../components/common/Navbar';
 import AnimatedBackground from '../components/common/AnimatedBackground';
+import { useAuth } from '../context/AuthContext';
 
 // Image imports (resolved relative to src/assets/)
 import voice1Image from '../assets/voice1.jpg';
@@ -30,6 +31,7 @@ import chat2Image from '../assets/chat2.jpg';
 import heroImage from '../assets/hero.png';
 
 export default function Landing() {
+  const { user } = useAuth();
   const [demoMessage, setDemoMessage] = useState('');
   const [demoChat, setDemoChat] = useState([
     { role: 'user', content: 'Hey twin! What is our stance on remote work?' },
@@ -103,8 +105,8 @@ export default function Landing() {
 
           {/* Buttons */}
           <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
-            <Link 
-              to="/analyze" 
+            <Link
+              to={user ? '/analyze' : '/signup'}
               className="group relative flex items-center justify-center gap-2 px-8 py-4 bg-gradient-to-r from-[#4F8BFF] to-[#8B5CF6] text-white font-semibold rounded-full overflow-hidden transition-all duration-300 hover:shadow-[0_0_25px_rgba(79,139,255,0.4)]"
             >
               Start Building
