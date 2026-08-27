@@ -1,3 +1,39 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Ambient background blobs (see AnimatedBackground.jsx) — plain CSS
+   keyframes instead of a JS animation loop so the compositor can run
+   these on the GPU thread without touching React/JS on every frame. */
+@keyframes drift-a {
+  0%   { transform: translate3d(0, 0, 0) scale(1); }
+  33%  { transform: translate3d(40px, 25px, 0) scale(1.08); }
+  66%  { transform: translate3d(-15px, -15px, 0) scale(0.95); }
+  100% { transform: translate3d(0, 0, 0) scale(1); }
+}
+
+@keyframes drift-b {
+  0%   { transform: translate3d(0, 0, 0) scale(1); }
+  33%  { transform: translate3d(-30px, -20px, 0) scale(0.95); }
+  66%  { transform: translate3d(20px, 15px, 0) scale(1.06); }
+  100% { transform: translate3d(0, 0, 0) scale(1); }
+}
+
+.bg-blob {
+  will-change: transform;
+}
+
+.bg-blob-a {
+  animation: drift-a 24s ease-in-out infinite;
+}
+
+.bg-blob-b {
+  animation: drift-b 28s ease-in-out infinite;
+  animation-delay: 1.5s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bg-blob {
+    animation: none !important;
+  }
+}
