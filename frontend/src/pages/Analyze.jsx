@@ -23,6 +23,16 @@ import AnalysisSidebar from '../components/features/analysis/AnalysisSidebar';
 import { api } from '../services/api';
 import { useProfile } from '../context/ProfileContext';
 
+// Frontend-only UX check, purely to avoid an unnecessary upload attempt
+// and give immediate feedback — must be kept in sync with the backend's
+// MAX_WHATSAPP_UPLOAD_SIZE_MB default (backend/app/config.py). The
+// backend enforces its own configured limit independently and is the
+// only real security boundary; if an operator changes the backend's
+// env var without updating this constant, uploads stay just as safe —
+// only this early warning would be briefly out of sync with it.
+const MAX_WHATSAPP_UPLOAD_MB = 15;
+const MAX_WHATSAPP_UPLOAD_BYTES = MAX_WHATSAPP_UPLOAD_MB * 1024 * 1024;
+
 export default function Analyze() {
   const navigate = useNavigate();
   const { fetchProfiles, selectProfile } = useProfile();
@@ -165,6 +175,13 @@ export default function Analyze() {
   // ============================================================
 
   const uploadWaFile = async (file) => {
+    if (file.size > MAX_WHATSAPP_UPLOAD_BYTES) {
+      setError(
+        `This WhatsApp export is too large. Maximum allowed size is ${MAX_WHATSAPP_UPLOAD_MB} MB.`
+      );
+      return;
+    }
+
     setWaStep('uploading');
     setError(null);
 
@@ -431,6 +448,7 @@ export default function Analyze() {
                     In WhatsApp: open the chat &rarr; ⋮ menu &rarr; More &rarr; Export chat &rarr; Without Media.
                     Upload the resulting .txt file below. 1:1 chats only for now.
                   </p>
+                  <p className="text-xs text-slate-500 mt-2">Maximum file size: {MAX_WHATSAPP_UPLOAD_MB} MB</p>
                 </div>
                 <div
                   onClick={() => fileInputRef.current?.click()}

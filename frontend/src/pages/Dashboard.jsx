@@ -19,6 +19,7 @@ import Card from '../components/common/Card';
 import Loader from '../components/common/Loader';
 import AnimatedBackground from '../components/common/AnimatedBackground';
 import StatCard from '../components/features/profile/StatCard';
+import PersonalityChart from '../components/features/profile/PersonalityChart';
 import { useProfile } from '../context/ProfileContext';
 import { api } from '../services/api';
 
@@ -202,10 +203,7 @@ export default function Dashboard() {
                 <Brain className="w-5 h-5 text-[#8B5CF6]" />
                 <h3 className="font-bold text-white text-lg">Personality</h3>
               </div>
-              <KeyValueGrid data={llm.personality} />
-              {!llm.personality && (
-                <p className="text-sm text-slate-500">No personality data available yet.</p>
-              )}
+              <PersonalityChart personality={llm.personality} />
             </Card>
 
             <Card className="space-y-5">

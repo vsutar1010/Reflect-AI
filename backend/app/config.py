@@ -22,12 +22,39 @@ def _bool(value: str | None, default: bool = False) -> bool:
     return value.strip().lower() in ("1", "true", "yes", "on")
 
 
+def _positive_int(value: str | None, default: int) -> int:
+    """Parses a positive integer from an env var, falling back to
+    `default` for anything missing, non-numeric, zero, or negative —
+    used for limits where 0/negative would otherwise silently disable
+    the protection they're meant to provide."""
+    if value is None:
+        return default
+    try:
+        parsed = int(value.strip())
+    except ValueError:
+        return default
+    return parsed if parsed > 0 else default
+
+
 # ==========================================================
 # Ollama (Text Chat + Analysis LLM)
 # ==========================================================
 
 OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://localhost:11434").rstrip("/")
 OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "mistral:7b-instruct-v0.3-q3_K_S")
+
+# ==========================================================
+# WhatsApp Chat Import
+# ==========================================================
+# Plain-text WhatsApp exports ("Export chat -> Without Media") are
+# compact — even a multi-year, tens-of-thousands-of-messages 1:1
+# history rarely reaches double-digit megabytes. 15MB gives a generous
+# margin over any realistic real chat while still bounding worst-case
+# memory/CPU usage in app/routers/analyze.py's upload handler and the
+# WhatsApp parser it feeds. Invalid/zero/negative values fall back to
+# this default rather than silently disabling the limit.
+MAX_WHATSAPP_UPLOAD_SIZE_MB = _positive_int(os.environ.get("MAX_WHATSAPP_UPLOAD_SIZE_MB"), 15)
+MAX_WHATSAPP_UPLOAD_SIZE_BYTES = MAX_WHATSAPP_UPLOAD_SIZE_MB * 1024 * 1024
 
 # ==========================================================
 # MongoDB (profiles + conversation history)

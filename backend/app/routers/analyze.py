@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 
+from app import config
 from app.dependencies import analyzer, get_current_user, whatsapp_import_service
 from app.schemas import (
     AnalysisMessageRequest,
@@ -13,7 +14,11 @@ from app.services.whatsapp_parser import WhatsAppParseError
 
 router = APIRouter(prefix="/api/analyze", tags=["analyze"])
 
-_MAX_UPLOAD_BYTES = 15 * 1024 * 1024  # 15MB
+# Read in fixed-size chunks rather than `await file.read()` in one shot —
+# this bounds how far over the configured limit a rejected upload can
+# ever get held in memory (at most one chunk past it) instead of fully
+# materializing an arbitrarily large file before the size check runs.
+_READ_CHUNK_BYTES = 1024 * 1024  # 1MB
 
 
 def _owned_session_or_404(session_id: str, owner_id: str):
@@ -82,14 +87,36 @@ async def upload_whatsapp_chat(file: UploadFile = File(...), current_user: dict 
     if not (file.filename or "").lower().endswith(".txt"):
         raise HTTPException(status_code=400, detail="Please upload a WhatsApp chat export (.txt).")
 
-    raw_bytes = await file.read()
-    if len(raw_bytes) > _MAX_UPLOAD_BYTES:
-        raise HTTPException(status_code=400, detail="File too large — max 15MB.")
+    max_bytes = config.MAX_WHATSAPP_UPLOAD_SIZE_BYTES
+
+    # Read in bounded chunks and abort the instant the running total
+    # crosses the limit — never holds more than ~one chunk over the
+    # limit in memory, unlike `await file.read()` followed by a size
+    # check, which fully materializes the file (however large) first.
+    # This also guarantees an oversized file never reaches the parser,
+    # AI analysis, or MongoDB below.
+    buffer = bytearray()
+    total_read = 0
+    while True:
+        chunk = await file.read(_READ_CHUNK_BYTES)
+        if not chunk:
+            break
+        total_read += len(chunk)
+        if total_read > max_bytes:
+            await file.close()
+            raise HTTPException(
+                status_code=413,
+                detail=(
+                    f"WhatsApp export is too large. Maximum allowed size is "
+                    f"{config.MAX_WHATSAPP_UPLOAD_SIZE_MB} MB."
+                ),
+            )
+        buffer.extend(chunk)
 
     try:
-        text = raw_bytes.decode("utf-8-sig")
+        text = bytes(buffer).decode("utf-8-sig")
     except UnicodeDecodeError:
-        text = raw_bytes.decode("utf-8", errors="replace")
+        text = bytes(buffer).decode("utf-8", errors="replace")
 
     try:
         res = whatsapp_import_service.create_upload(text, current_user["id"])

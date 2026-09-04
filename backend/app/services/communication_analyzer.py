@@ -1148,7 +1148,11 @@ Required format
     "name": "",
 
     "personality": {{
-
+        "openness": {{"score": 0, "description": ""}},
+        "conscientiousness": {{"score": 0, "description": ""}},
+        "extraversion": {{"score": 0, "description": ""}},
+        "agreeableness": {{"score": 0, "description": ""}},
+        "neuroticism": {{"score": 0, "description": ""}}
     }},
 
     "thinking_pattern": {{
@@ -1176,6 +1180,15 @@ Required format
 
 For "name": extract the person's first name if they mentioned it anywhere
 in the conversation. If no name was ever mentioned, return an empty string.
+
+For "personality": score this person on the Big Five personality traits
+(Openness, Conscientiousness, Extraversion, Agreeableness, Neuroticism)
+based ONLY on what their messages above actually show — do not guess
+beyond the evidence. Each "score" must be an integer from 0 to 100 (0 =
+trait is essentially absent, 100 = trait is extremely strong, 50 = an
+average/typical amount). Each "description" is a short phrase (3-8
+words) explaining that specific score, e.g. "curious, asks a lot of
+questions" or "prefers routine over new experiences".
 
 For "example_replies": this is the most important field. Write 8 short
 example text-message exchanges showing EXACTLY how this specific person
