@@ -26,6 +26,86 @@ async function fetchJSON(endpoint, options = {}) {
   return handleResponse(res);
 }
 
+// Posts to `endpoint` asking for a `text/event-stream` reply and reads it
+// as SSE (`data: {...}\n\n` frames, matching the shape the backend's
+// streaming chat endpoints already emit). Each frame is one of
+// `{ delta }`, `{ done: true }`, or `{ error }`.
+async function streamSSE(endpoint, body, { onDelta, onDone, onError, signal } = {}) {
+  let res;
+  try {
+    res = await fetch(`${API_BASE}${endpoint}`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'text/event-stream',
+      },
+      body: JSON.stringify(body),
+      signal,
+    });
+  } catch (err) {
+    if (err.name === 'AbortError') return;
+    onError?.(err.message || 'Network error');
+    return;
+  }
+
+  if (!res.ok || !res.body) {
+    let errorMsg = `API Error: ${res.status} ${res.statusText}`;
+    try {
+      const errorData = await res.json();
+      if (errorData.detail) errorMsg = errorData.detail;
+    } catch (_) {}
+    onError?.(errorMsg);
+    return;
+  }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+
+      let sepIndex;
+      while ((sepIndex = buffer.indexOf('\n\n')) !== -1) {
+        const rawEvent = buffer.slice(0, sepIndex);
+        buffer = buffer.slice(sepIndex + 2);
+
+        const dataLine = rawEvent.split('\n').find((line) => line.startsWith('data:'));
+        if (!dataLine) continue;
+        const jsonStr = dataLine.slice(5).trim();
+        if (!jsonStr) continue;
+
+        let payload;
+        try {
+          payload = JSON.parse(jsonStr);
+        } catch (_) {
+          continue;
+        }
+
+        if (payload.error) {
+          onError?.(payload.error);
+          return;
+        }
+        if (payload.delta) {
+          onDelta?.(payload.delta);
+        }
+        if (payload.done) {
+          onDone?.();
+          return;
+        }
+      }
+    }
+    onDone?.();
+  } catch (err) {
+    if (err.name === 'AbortError') return;
+    onError?.(err.message || 'Stream interrupted');
+  }
+}
+
 export const api = {
   // Auth
   requestSignupOtp: ({ email, password, name }) =>
@@ -94,6 +174,11 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ session_id: sessionId, message }),
     }),
+  // Streaming variant used by the chat UI: same endpoint, but asks for
+  // `text/event-stream` so the reply arrives token-by-token instead of
+  // all at once. `callbacks` is { onDelta, onDone, onError, signal }.
+  streamChatMessage: (sessionId, message, callbacks) =>
+    streamSSE('/chat/message', { session_id: sessionId, message }, callbacks),
 
   // Voice Chat Flow (Vapi)
   getVoiceConfig: () => fetchJSON('/voice/config'),

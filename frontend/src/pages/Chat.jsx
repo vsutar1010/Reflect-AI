@@ -21,6 +21,16 @@ export default function Chat() {
   const [error, setError] = useState(null);
 
   const startedForProfile = useRef(null);
+  const streamAbortRef = useRef(null);
+
+  const abortActiveStream = () => {
+    streamAbortRef.current?.abort();
+    streamAbortRef.current = null;
+  };
+
+  // Cancel any in-flight stream if the component goes away mid-reply, so
+  // we don't try to update state after unmount.
+  useEffect(() => () => abortActiveStream(), []);
 
   useEffect(() => {
     if (!selectedProfile) {
@@ -29,6 +39,7 @@ export default function Chat() {
     }
     if (startedForProfile.current === selectedProfile.id) return;
     startedForProfile.current = selectedProfile.id;
+    abortActiveStream();
 
     async function startSession() {
       setLoadingSession(true);
@@ -62,29 +73,56 @@ export default function Chat() {
     startSession();
   }, [selectedProfile]);
 
-  const handleSend = async () => {
+  const handleSend = () => {
     const text = input.trim();
     if (!text || !sessionId || isTyping) return;
 
-    setMessages((prev) => [...prev, { role: 'user', content: text, timestamp: Date.now() }]);
+    // Unique id (not array index) so the streaming updates below always
+    // find the right bubble even if messages are added/removed around it.
+    const assistantMessageId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+    setMessages((prev) => [
+      ...prev,
+      { role: 'user', content: text, timestamp: Date.now() },
+      { role: 'assistant', content: '', timestamp: Date.now(), id: assistantMessageId, streaming: true },
+    ]);
     setInput('');
     setIsTyping(true);
     setError(null);
 
-    try {
-      const res = await api.sendChatMessage(sessionId, text);
-      setMessages((prev) => [
-        ...prev,
-        { role: 'assistant', content: res.reply, timestamp: Date.now() },
-      ]);
-    } catch (err) {
-      setError(err.message || 'Failed to get a reply. Is Ollama running?');
-    } finally {
+    const controller = new AbortController();
+    streamAbortRef.current = controller;
+
+    const finishStream = ({ removeIfEmpty = false } = {}) => {
+      setMessages((prev) => {
+        const msg = prev.find((m) => m.id === assistantMessageId);
+        if (removeIfEmpty && msg && !msg.content) {
+          return prev.filter((m) => m.id !== assistantMessageId);
+        }
+        return prev.map((m) => (m.id === assistantMessageId ? { ...m, streaming: false } : m));
+      });
       setIsTyping(false);
-    }
+      streamAbortRef.current = null;
+    };
+
+    api.streamChatMessage(sessionId, text, {
+      signal: controller.signal,
+      onDelta: (delta) => {
+        setMessages((prev) =>
+          prev.map((m) => (m.id === assistantMessageId ? { ...m, content: m.content + delta } : m))
+        );
+      },
+      onDone: () => finishStream({ removeIfEmpty: true }),
+      onError: (message) => {
+        setError(message || 'Failed to get a reply. Is Ollama running?');
+        finishStream({ removeIfEmpty: true });
+      },
+    });
   };
 
   const restartSession = () => {
+    abortActiveStream();
+    setIsTyping(false);
     startedForProfile.current = null;
     setSessionId(null);
     setMessages([]);
@@ -170,7 +208,7 @@ export default function Chat() {
           ) : (
             <MessageList
               messages={messages}
-              isTyping={isTyping}
+              isTyping={isTyping && !messages.some((m) => m.streaming)}
               twinInitial={selectedProfile.name}
             />
           )}

@@ -9,7 +9,7 @@ in-memory session map and the actual Ollama call.
 
 from __future__ import annotations
 
-from typing import Dict
+from typing import Dict, Iterator
 
 from app.adapters import ollama_adapter
 from app.services.ollama_client import OllamaClient
@@ -82,6 +82,41 @@ class TextChatService:
         session["history"] = self.engine.append_message(profile_id, "assistant", reply, channel="text")
 
         return {"reply": reply}
+
+    def stream_chat(self, session_id: str, message: str) -> Iterator[str]:
+        """
+        Same turn as chat() — same history append, same context window,
+        same reply persisted to memory at the end — but yields the reply
+        token-by-token as Ollama generates it, so the caller (the
+        /api/chat/message SSE branch) can forward each token to the
+        frontend as soon as it exists instead of waiting for the full
+        reply. Mirrors VoiceChatService.stream_turn.
+        """
+        session = self.get_session(session_id)
+        if session is None:
+            raise SessionNotFoundError("Invalid session id")
+
+        profile_id = session["profile_id"]
+
+        session["history"] = self.engine.append_message(profile_id, "user", message, channel="text")
+
+        dynamic_context = self.engine.build_dynamic_context(
+            self.engine.get_recent_user_messages(session["history"])
+        )
+
+        messages = self.engine.build_context_window(
+            session["system_messages"],
+            session["history"],
+            dynamic_context=dynamic_context,
+        )
+
+        full_reply = []
+        for token in self.client.stream_chat(messages, temperature=0.6, max_tokens=60):
+            full_reply.append(token)
+            yield token
+
+        reply = "".join(full_reply)
+        session["history"] = self.engine.append_message(profile_id, "assistant", reply, channel="text")
 
     def export_chat(self, session_id: str):
         session = self.get_session(session_id)
