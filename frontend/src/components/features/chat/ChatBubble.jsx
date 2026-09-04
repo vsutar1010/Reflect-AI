@@ -23,7 +23,7 @@ export default function ChatBubble({ role, content, timestamp, twinInitial = 'T'
           className={`px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap break-words rounded-2xl ${
             isUser
               ? 'bg-gradient-to-r from-[#4F8BFF] to-[#8B5CF6] text-white rounded-br-sm shadow-[0_0_15px_rgba(79,139,255,0.25)]'
-              : 'bg-[#09090B]/70 backdrop-blur-xl border border-white/10 text-slate-200 rounded-bl-sm'
+              : 'bg-[#09090B]/70 border border-white/10 text-slate-200 rounded-bl-sm'
           }`}
         >
           {content}
