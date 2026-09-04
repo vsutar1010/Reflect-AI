@@ -1,27 +1,30 @@
 # ReflectAI — Backend Documentation
 
-> **Purpose:** Complete reference for the FastAPI Python backend. Feed this file to any AI to get full context — every file, class, method, endpoint, data flow, and storage schema is documented here.
-> **Last Updated:** 2026-08-06 | **API Version:** 2.0.0
+> **Purpose:** Complete reference for the FastAPI Python backend. Feed this file to any AI to get full context — every router, service, endpoint, and storage schema is documented here.
+> **Last Updated:** 2026-09-04 | **API Version:** 2.0.0
 
 ---
 
 ## Tech Stack
 
-| Tool | Version | Purpose |
-|------|---------|------------|
-| Python | 3.10+ | Language |
-| FastAPI | latest | REST API framework |
-| Uvicorn | latest | ASGI server |
-| Pydantic | v2 | Request/response schema validation |
-| Ollama | local server | Local LLM inference |
-| emoji | Python lib | Emoji detection in communication analysis |
-| python-dotenv | latest | .env file loading |
-| pymongo | 4.9.2 | MongoDB driver |
-| dnspython | latest | Required by pymongo for `mongodb+srv://` (Atlas) URIs |
-| @vapi-ai/web | npm | Vapi Web SDK (frontend, not backend) |
+| Tool | Purpose |
+|------|------|
+| Python 3.10+ | Language |
+| FastAPI | REST API framework |
+| Uvicorn | ASGI server (`--reload` enabled via `run.py`) |
+| Pydantic v2 | Request/response schema validation (`app/schemas.py`) |
+| Ollama | Local LLM inference (analysis, text chat, Reflect, custom-llm voice) |
+| pymongo + dnspython + certifi | MongoDB driver (Atlas `mongodb+srv://` support + TLS) |
+| PyJWT | Session cookie signing/verification |
+| bcrypt | Password hashing |
+| google-auth | Google ID token verification (Sign-In with Google) |
+| smtplib (stdlib) | Sends the signup OTP email |
+| emoji | Emoji detection in communication analysis |
+| python-dotenv | `.env` loading |
+| @vapi-ai/web | Vapi Web SDK (frontend, not backend) |
 
-**Default LLM model:** `mistral:7b-instruct-v0.3-q3_K_S` (configurable via `OLLAMA_MODEL` env var)
-**Database:** MongoDB (Atlas or self-hosted, via `MONGODB_URI`). Profiles and conversation history (text + voice) are stored there — see [File Storage Schema](#file-storage-schema). In-progress analysis/chat/voice *sessions* (the live interview or an open chat's session_id lookup) remain in-memory dicts, not yet persisted.
+**Default LLM model:** `mistral:7b-instruct-v0.3-q3_K_S` (configurable via `OLLAMA_MODEL`).
+**Database:** MongoDB (Atlas or self-hosted, via `MONGODB_URI`) — the only storage; there is no file-based fallback. In-progress analysis/chat/voice *sessions* and the auth rate limiters remain in-memory dicts, not persisted.
 
 ---
 
@@ -33,42 +36,40 @@ backend/
 ├── .env                                    # Environment secrets (never committed)
 ├── .env.example                            # Template for all env vars
 ├── requirements.txt                        # Python dependencies
-├── personality.json                        # LEGACY: example profile (not used by API)
 └── app/
-    ├── __init__.py                         # Package marker
-    ├── main.py                             # FastAPI app, router registration (v2.0.0)
+    ├── __init__.py
+    ├── main.py                             # FastAPI app, router registration, middleware
     ├── schemas.py                          # Pydantic request/response models
-    ├── config.py                           # Centralized env var config (Ollama + Vapi + MongoDB)
-    ├── database.py                         # MongoDB client + collections (profiles, conversations)
-    ├── dependencies.py                     # Shared service singletons (DI)
-    ├── adapters/                           # External service adapters
+    ├── config.py                           # Centralized env var config
+    ├── database.py                         # MongoDB client + collections
+    ├── dependencies.py                     # Shared service singletons + get_current_user
+    ├── middleware.py                       # MaxUploadSizeMiddleware (WhatsApp import)
+    ├── adapters/
+    │   ├── ollama_adapter.py               # TwinContext → Ollama message list
+    │   └── vapi_adapter.py                 # TwinContext → Vapi system prompt string
     ├── routers/
-    │   ├── __init__.py
-    │   ├── analyze.py                      # POST /api/analyze/* endpoints
-    │   ├── chat.py                         # POST /api/chat/* endpoints
-    │   ├── profiles.py                     # GET/DELETE /api/profiles/* endpoints
+    │   ├── auth.py                         # POST /api/auth/*
+    │   ├── analyze.py                      # POST /api/analyze/* + WhatsApp import
+    │   ├── chat.py                         # POST /api/chat/* (JSON + SSE)
+    │   ├── profiles.py                     # GET/PUT/DELETE /api/profiles/*
+    │   ├── reflect.py                      # CRUD /api/reflect/*
     │   └── voice.py                        # GET/POST /api/voice/* + SSE + webhook
     └── services/
-        ├── __init__.py
+        ├── auth_service.py                 # Password hashing, JWTs, Google verification
+        ├── email_service.py                # SMTP OTP delivery
+        ├── rate_limiter.py                 # In-memory fixed-window rate limiter
         ├── analyzer.py                     # PersonalityAnalyzer — interview orchestration
-        ├── chat.py                         # TwinChat — text chat session shim
-        ├── communication_analyzer.py       # CommunicationAnalyzer — pure Python NLP
+        ├── communication_analyzer.py       # CommunicationAnalyzer — pure Python NLP + LLM prompt
+        ├── whatsapp_parser.py              # WhatsApp .txt export → messages
+        ├── whatsapp_import_service.py      # Upload/finalize orchestration
         ├── twin_engine.py                  # DigitalTwinEngine — shared brain (text + voice)
-        ├── twin_context.py                 # Supporting context utilities
+        ├── twin_context.py                 # TwinContext dataclass
+        ├── chat.py                         # TextChatService — text chat + summarization
         ├── voice_chat_service.py           # VoiceChatService — Vapi voice integration
-        ├── vapi_client.py                  # VapiClient — webhook verification + REST
+        ├── vapi_client.py                  # Webhook secret verification + REST
+        ├── reflect_service.py              # ReflectService — AI journaling analysis
         └── ollama_client.py                # OllamaClient — HTTP wrapper for Ollama REST API
 ```
-
-**MongoDB collections (not files — see [File Storage Schema](#file-storage-schema)):**
-```
-profiles       — one document per twin (profile + metadata + interview transcript)
-conversations  — one document per chat thread (text + voice, shared)
-```
-
-`backend/profiles/` (the old flat-file storage location) may still exist on
-disk as a pre-migration backup — see `backend/scripts/migrate_to_mongodb.py`
-— but the running app no longer reads or writes it.
 
 ---
 
@@ -78,644 +79,334 @@ disk as a pre-migration backup — see `backend/scripts/migrate_to_mongodb.py`
 cd backend
 pip install -r requirements.txt
 python run.py
-# Server starts at http://0.0.0.0:8000
-# Reload enabled — auto-restarts on file changes
+# Server starts at http://0.0.0.0:8000, reload enabled
 ```
 
-**Requirements:** Ollama must be running locally at `http://localhost:11434` with a model pulled.
+**Requires, always:**
+- Ollama running locally with a model pulled (`ollama pull mistral:7b-instruct-v0.3-q3_K_S`, `ollama serve`)
+- `MONGODB_URI` set in `.env` — the backend pings MongoDB on startup and fails fast if it can't connect
+- `JWT_SECRET` set in `.env` — the backend refuses to start without it (signs the session cookie)
 
-```bash
-ollama pull mistral:7b-instruct-v0.3-q3_K_S
-ollama serve
-```
+**For signup to work:** `SMTP_USERNAME`/`SMTP_PASSWORD` set (existing users can still log in without this).
 
-**Also requires:** `MONGODB_URI` set in `.env` (e.g. a MongoDB Atlas connection
-string). The backend pings MongoDB on startup and fails fast with a clear
-error if it can't connect — see `app/database.py`. If you have existing data
-in `backend/profiles/` from before this migration, run
-`python scripts/migrate_to_mongodb.py` once to import it.
-
-**For Voice Chat:** You also need:
-1. A [Vapi](https://vapi.ai) account with `VAPI_PUBLIC_KEY` set in `.env`
-2. A public tunnel (e.g. ngrok) with `PUBLIC_BACKEND_URL` set in `.env`
-3. Either keep `VAPI_LLM_PROVIDER=custom-llm` (default, uses Ollama) or set `VAPI_LLM_PROVIDER=vapi-native` (uses gpt-4o-mini, faster)
+**For Voice Chat:** `VAPI_PUBLIC_KEY` + `PUBLIC_BACKEND_URL` (a public tunnel, e.g. ngrok) set — see `README.md` step 7.
 
 ---
 
 ## backend/app/config.py — Centralized Configuration
 
-All environment variables with defaults. Loaded from `.env` via `python-dotenv`.
+All environment variables with defaults, loaded from `.env`. See `backend/.env.example` for the fully commented template.
 
-### Ollama Settings
+### Ollama
+| Var | Default |
+|-----|---------|
+| `OLLAMA_HOST` | `http://localhost:11434` |
+| `OLLAMA_MODEL` | `mistral:7b-instruct-v0.3-q3_K_S` |
+
+### WhatsApp Import
+| Var | Default | Notes |
+|-----|---------|-------|
+| `MAX_WHATSAPP_UPLOAD_SIZE_MB` | `15` | Invalid/zero/negative values fall back to the default rather than disabling the limit (`_positive_int` helper) |
+
+### MongoDB
+| Var | Default |
+|-----|---------|
+| `MONGODB_URI` | `""` (required — raises `RuntimeError` at import time if unset) |
+| `MONGODB_DB_NAME` | `reflectai` |
+
+### Authentication
+| Var | Default | Notes |
+|-----|---------|-------|
+| `JWT_SECRET` | *(required, no default)* | Raises `RuntimeError` at import time if unset |
+| `JWT_ALGORITHM` | `HS256` | Not env-configurable |
+| `JWT_EXPIRE_DAYS` | `14` | |
+| `SESSION_COOKIE_NAME` | `reflectai_session` | Not env-configurable |
+| `GOOGLE_CLIENT_ID` | `""` | Blank disables Google Sign-In |
+| `FRONTEND_ORIGIN` | `http://localhost:5173` | CORS `allow_origins`, must be exact (credentialed requests can't use `*`) |
+| `COOKIE_SECURE` | `False` | Set `true` once served over HTTPS |
+| `AUTH_LOGIN_MAX_ATTEMPTS` / `AUTH_LOGIN_WINDOW_SECONDS` | `5` / `900` | Failed login attempts per client IP |
+| `AUTH_OTP_REQUEST_MAX_ATTEMPTS` / `AUTH_OTP_REQUEST_WINDOW_SECONDS` | `5` / `900` | Signup OTP requests per client IP |
+
+### Email (signup OTP)
+| Var | Default |
+|-----|---------|
+| `SMTP_HOST` | `smtp.gmail.com` |
+| `SMTP_PORT` | `587` |
+| `SMTP_USERNAME` / `SMTP_PASSWORD` | `""` |
+| `SMTP_FROM_NAME` | `ReflectAI` |
+| `OTP_EXPIRE_MINUTES` | `10` |
+| `OTP_RESEND_COOLDOWN_SECONDS` | `60` |
+| `OTP_MAX_ATTEMPTS` | `5` |
+
+`smtp_configured() -> bool` — whether `SMTP_USERNAME`/`SMTP_PASSWORD` are both set.
+
+### Vapi (Voice Chat)
 | Var | Default | Description |
 |-----|---------|-------------|
-| `OLLAMA_HOST` | `http://localhost:11434` | Ollama server URL |
-| `OLLAMA_MODEL` | `mistral:7b-instruct-v0.3-q3_K_S` | Default LLM model |
+| `PUBLIC_BACKEND_URL` | `""` | Public tunnel URL, required for Voice Chat |
+| `VAPI_PUBLIC_KEY` / `VAPI_PRIVATE_KEY` | `""` | Browser SDK key / server REST key (optional) |
+| `VAPI_SERVER_SECRET` | `""` | Verifies webhook/custom-llm requests actually came from Vapi |
+| `VAPI_ASSISTANT_ID` | `""` | Optional pre-created assistant template |
+| `VAPI_VOICE_PROVIDER` / `VAPI_VOICE_ID` | `vapi` / `Elliot` | TTS fallback when a profile hasn't picked one — see `VAPI_VOICE_PRESETS` (male→Elliot, female→Savannah, set via `PUT /api/profiles/{id}/voice`) |
+| `VAPI_TRANSCRIBER_PROVIDER/MODEL/LANGUAGE` | `deepgram` / `nova-2` / `en` | STT |
+| `VAPI_LLM_PROVIDER` | `vapi-native` | `vapi-native` (default, fast, hosted) or `custom-llm` (local Ollama, slow) |
+| `VAPI_NATIVE_MODEL_PROVIDER` / `VAPI_NATIVE_MODEL` | `openrouter` / `google/gemma-4-26b-a4b-it:free` | Only used in `vapi-native` mode |
+| `VOICE_MAX_TOKENS` / `VOICE_TEMPERATURE` | `60` / `0.6` | |
+| `VAPI_CUSTOM_LLM_TIMEOUT_SECONDS` | `120` | `custom-llm` mode only |
+| `VAPI_SILENCE_TIMEOUT_SECONDS` | `180` | `custom-llm` mode only |
 
-### MongoDB Settings
-| Var | Default | Description |
-|-----|---------|-------------|
-| `MONGODB_URI` | `""` | Full connection string (Atlas `mongodb+srv://...` or local `mongodb://localhost:27017`) |
-| `MONGODB_DB_NAME` | `reflectai` | Database name |
-
-### Vapi Settings
-| Var | Default | Description |
-|-----|---------|-------------|
-| `VAPI_PUBLIC_KEY` | `""` | Browser-facing key for Vapi Web SDK |
-| `VAPI_PRIVATE_KEY` | `""` | Server-side key for Vapi REST API |
-| `VAPI_SERVER_SECRET` | `""` | Shared secret verified on webhook + custom-LLM requests |
-| `VAPI_LLM_PROVIDER` | `custom-llm` | `custom-llm` (Ollama) or `vapi-native` (cloud model) |
-| `VAPI_NATIVE_MODEL_PROVIDER` | `openai` | Provider for vapi-native mode |
-| `VAPI_NATIVE_MODEL` | `gpt-4o-mini` | Model for vapi-native mode |
-| `PUBLIC_BACKEND_URL` | `""` | Public URL of this backend (ngrok tunnel URL) |
-| `VAPI_VOICE_PROVIDER` | `vapi` | TTS provider |
-| `VAPI_VOICE_ID` | `Elliot` | TTS voice |
-| `VAPI_TRANSCRIBER_PROVIDER` | `deepgram` | STT provider |
-| `VAPI_TRANSCRIBER_MODEL` | `nova-2` | STT model |
-| `VAPI_TRANSCRIBER_LANGUAGE` | `en` | STT language |
-
-### Performance Tuning
-| Var | Default | Description |
-|-----|---------|-------------|
-| `VOICE_MAX_TOKENS` | `60` | Max tokens per voice reply |
-| `VOICE_TEMPERATURE` | `0.6` | Temperature for voice replies |
-| `VAPI_CUSTOM_LLM_TIMEOUT_SECONDS` | `120` | Vapi waits this long for first token from custom-LLM |
-| `VAPI_SILENCE_TIMEOUT_SECONDS` | `180` | Vapi hangs up call after this many seconds of silence |
-
-### Helper Functions
-- `voice_status() -> (bool, str)` — checks if enough config is present for voice; returns (enabled, reason_if_not)
-- `voice_enabled() -> bool` — shorthand
-- `custom_llm_base_url(session_id) -> str` — builds the Vapi custom-LLM base URL (Vapi appends `/chat/completions`)
+`voice_status() -> (bool, str)` / `voice_enabled() -> bool` — whether enough config is present, surfaced to the frontend via `GET /api/voice/config`.
+`custom_llm_base_url(session_id) -> str` — builds the per-session custom-llm base URL.
 
 ---
 
-## backend/app/database.py — MongoDB Connection (NEW)
+## backend/app/database.py — MongoDB Connection
 
-The single place that owns the MongoDB client. A `MongoClient` is created
-once at import time (thread-safe, pools connections internally) — mirrors
-the service-singleton pattern in `dependencies.py`.
+One `MongoClient` created at import time (thread-safe, pools connections). Fails fast (`RuntimeError`) if `MONGODB_URI` is unset or unparseable.
 
 ```python
-client = MongoClient(config.MONGODB_URI, tlsCAFile=certifi.where())
-db = client[config.MONGODB_DB_NAME]
-
-profiles_collection = db["profiles"]
+profiles_collection      = db["profiles"]
 conversations_collection = db["conversations"]
+users_collection         = db["users"]
+reflections_collection   = db["reflections"]
 ```
 
-- `ping()` — verifies the connection; called on app startup so a bad `MONGODB_URI` fails immediately instead of surfacing as a confusing 500 later
-- `init_indexes()` — creates an index on `conversations.profile_id` (used by conversation listing and cascade delete)
+- `ping()` — called on startup; a bad `MONGODB_URI` fails immediately instead of surfacing as a confusing 500 later.
+- `init_indexes()` — `conversations.profile_id`, `profiles.owner_id`, `users.email` (unique), `users.google_sub` (unique, sparse), `reflections.(owner_id, created_at)`, `reflections.profile_id`.
 
 ---
 
-## backend/app/main.py — FastAPI App (v2.0.0)
-
-Minimal router-based app. All route logic lives in routers/.
+## backend/app/main.py — FastAPI App
 
 ```python
 app = FastAPI(title="ReflectAI API", version="2.0.0")
 
-app.add_middleware(CORSMiddleware, allow_origins=["*"], ...)
+app.add_middleware(MaxUploadSizeMiddleware, path="/api/analyze/whatsapp/upload", ...)
+app.add_middleware(CORSMiddleware, allow_origins=[config.FRONTEND_ORIGIN],
+                    allow_credentials=True, expose_headers=["Retry-After"])
 
+app.include_router(auth.router)
 app.include_router(analyze.router)
 app.include_router(chat.router)
 app.include_router(voice.router)
 app.include_router(profiles.router)
-
+app.include_router(reflect.router)
 
 @app.on_event("startup")
 def on_startup():
-    database.ping()          # fails fast if MongoDB is unreachable
+    database.ping()
     database.init_indexes()
 ```
 
+`MaxUploadSizeMiddleware` (added before `CORSMiddleware`, so it ends up as the *inner* layer and CORS headers still apply to its own `413` response) rejects an oversized WhatsApp upload by `Content-Length` before Starlette parses the multipart body at all. `expose_headers=["Retry-After"]` is required because that header isn't CORS-safelisted by default — without it the frontend's 429 handling couldn't read it cross-origin.
+
+`allow_origins` is a single explicit origin (`FRONTEND_ORIGIN`), not `"*"` — browsers reject a wildcard combined with `allow_credentials=True`, which this app needs for the session cookie.
+
 ---
 
-## backend/app/schemas.py — All Pydantic Models
+## backend/app/schemas.py — Pydantic Models (by API area)
 
-### Analysis API
-```python
-class StartAnalysisResponse(BaseModel):
-    session_id: str
-    message: str
+**Auth:** `SignupRequest` (email, password min 8, name), `VerifyOtpRequest` (email, 6-digit otp), `LoginRequest`, `GoogleAuthRequest` (credential), `UserResponse` (id, email, name)
 
-class AnalysisMessageRequest(BaseModel):
-    session_id: str
-    message: str
+**Analysis:** `StartAnalysisResponse`, `AnalysisMessageRequest/Response` (progress 0-100), `FinalizeAnalysisRequest` (profile_name optional)
 
-class AnalysisMessageResponse(BaseModel):
-    question: str
-    progress: int   # 0-100 (Field with ge=0, le=100)
+**WhatsApp:** `WhatsAppParticipant`, `WhatsAppUploadResponse` (upload_id, participants, total/system/media/deleted message counts), `WhatsAppFinalizeRequest`
 
-class FinalizeAnalysisRequest(BaseModel):
-    session_id: str
-    profile_name: str
-```
+**Chat:** `StartChatRequest/Response` (history: List[`ChatHistoryMessage`]), `ChatMessageRequest/Response`
 
-### Chat API
-```python
-class StartChatRequest(BaseModel):
-    profile_id: str
+**Voice:** `VoiceConfigResponse`, `StartVoiceSessionRequest/Response`, `EndVoiceSessionRequest`, `VoiceSessionStatusResponse`, `SetProfileVoiceRequest` (gender: "male"|"female")
 
-class StartChatResponse(BaseModel):
-    session_id: str
-    message: str
+**Reflect:** `ReflectAnalysis` (status, mood, themes, reflection, observations, next_step, error), `CreateReflectEntryRequest`/`UpdateReflectEntryRequest` (content, 1-8000 chars), `ReflectEntryResponse`
 
-class ChatMessageRequest(BaseModel):
-    session_id: str
-    message: str
+**Generic:** `SuccessResponse`, `ErrorResponse`
 
-class ChatMessageResponse(BaseModel):
-    reply: str
-```
-
-### Voice API (NEW)
-```python
-class StartVoiceSessionRequest(BaseModel):
-    profile_id: str
-
-class StartVoiceSessionResponse(BaseModel):
-    session_id: str
-    public_key: str
-    assistant: dict              # Full inline Vapi assistant config
-
-class EndVoiceSessionRequest(BaseModel):
-    session_id: str
-
-class VoiceSessionStatusResponse(BaseModel):
-    session_id: str
-    status: str                  # created | active | ended
-    duration_seconds: float
-
-class VoiceConfigResponse(BaseModel):
-    enabled: bool
-    public_key: str
-    llm_provider: str            # custom-llm | vapi-native
-    reason: str                  # empty string if enabled; explains why if not
-```
-
-### Generic
-```python
-class SuccessResponse(BaseModel):
-    success: bool = True
-    message: str
-
-class PersonalityProfile(BaseModel):   # Defined but not used in response_model (profiles returned as raw dicts)
-    identity: Dict[str, Any]
-    ...
-```
+`PersonalityProfile` is defined but not used as a `response_model` anywhere (profiles are returned as raw dicts).
 
 ---
 
 ## All API Endpoints
 
-### Analysis Endpoints (routers/analyze.py)
+### Auth (routers/auth.py)
 
-#### POST /api/analyze/start
-**Request:** None  
-**Response:** `{ session_id, message: "Hi! I'm ReflectAI..." }`  
-Creates a new in-memory analysis session, returns session UUID + first question.
+| Endpoint | Notes |
+|---|---|
+| `POST /api/auth/signup/request-otp` | Rate-limited per IP. Always returns the same generic `200` regardless of whether the email is new, already registered, or on resend cooldown (enumeration protection). Real path: generates a 6-digit OTP, emails it, stores a pending signup in memory. Fake path: pays an equivalent bcrypt-hash + dummy-SMTP-connect cost so timing doesn't distinguish the cases either. |
+| `POST /api/auth/signup/verify-otp` | Matches OTP against the pending signup; on success creates the user and sets the session cookie. `400` on expired/missing/wrong code or too many attempts. |
+| `POST /api/auth/login` | Rate-limited per IP (failed attempts only; success resets the counter). `401 "Invalid email or password."` for nonexistent email, wrong password, *and* Google-only accounts alike — same status/body/timing (dummy bcrypt hash used when there's no real password to check). `429` + `Retry-After` once the limit is hit. |
+| `POST /api/auth/google` | Verifies the Google ID token server-side; finds-or-creates the user (links by email if a password account with the same email exists), sets the session cookie. |
+| `POST /api/auth/logout` | Clears the session cookie. |
+| `GET /api/auth/me` | Returns the current user (requires the session cookie). |
 
-#### POST /api/analyze/message
-**Request:** `{ session_id, message }`  
-**Response:** `{ question, progress }` (progress 0-100)  
-Appends user answer, runs CommunicationAnalyzer, generates AI follow-up (or bank fallback), returns next question. Returns `{ question: "", progress: 100 }` when complete.
+### Analysis + WhatsApp Import (routers/analyze.py)
 
-#### POST /api/analyze/finalize
-**Request:** `{ session_id, profile_name }`  
-**Response:** `{ profile_id, profile }` (full profile dict)  
-Runs full personality analysis, builds identity_prompt, writes profile to disk, deletes session.
+| Endpoint | Notes |
+|---|---|
+| `POST /api/analyze/start` | Creates an in-memory session owned by `current_user`, returns the first question. |
+| `POST /api/analyze/message` | Appends the answer, runs `CommunicationAnalyzer`, generates an AI follow-up (or falls back to the question bank). Returns `{question: "", progress: 100}` when the bank is exhausted. |
+| `POST /api/analyze/finalize` | Runs full personality analysis, builds `identity_prompt`, inserts into MongoDB `profiles`, deletes the session. |
+| `POST /api/analyze/whatsapp/upload` | `.txt` only. Reads in 1MB chunks, aborts with `413` the instant the running total exceeds `MAX_WHATSAPP_UPLOAD_SIZE_MB` — never materializes an oversized file. Returns participants + message counts. |
+| `POST /api/analyze/whatsapp/finalize` | Runs the picked sender's messages through the same analysis pipeline as the interview flow. |
 
----
+### Chat (routers/chat.py)
 
-### Chat Endpoints (routers/chat.py)
+| Endpoint | Notes |
+|---|---|
+| `POST /api/chat/start` | Requires the profile to be owned by `current_user`. Creates a session via `TextChatService`, returns the opening line (no LLM call) + existing history. |
+| `POST /api/chat/message` | Session ownership checked (`session.owner_id == current_user.id`). **`Accept: text/event-stream`** → `StreamingResponse` of `data: {"delta": "..."}` frames ending in `data: {"done": true}` (or `data: {"error": "..."}`). Any other `Accept` → plain JSON `{reply}` (kept for non-browser callers). Both paths run the exact same context-build + summarization-catch-up logic; the reply is persisted to MongoDB either way. |
 
-#### POST /api/chat/start
-**Request:** `{ profile_id }`  
-**Response:** `{ session_id, message: <opening_line> }`  
-Creates chat session via TwinChat → DigitalTwinEngine. Loads profile + history. Returns instant greeting (no LLM call).
+### Profiles (routers/profiles.py)
 
-#### POST /api/chat/message
-**Request:** `{ session_id, message }`  
-**Response:** `{ reply }`  
-Appends user message, runs DigitalTwinEngine context build, calls Ollama (temp=0.6, max_tokens=60), appends + persists reply. Returns reply text. **Non-streaming** — full reply returned once complete.
+| Endpoint | Notes |
+|---|---|
+| `GET /api/profiles` | Lists the current user's profiles, sorted by `last_used` desc, with `conversation_count`. |
+| `GET /api/profiles/{id}` | 404 if not owned by `current_user`. Returns `{metadata, profile}`. |
+| `PUT /api/profiles/{id}/voice` | Sets `{gender: "male"|"female"}` → resolves to a `VAPI_VOICE_PRESETS` entry, stored on the profile. |
+| `DELETE /api/profiles/{id}` | Also deletes all `conversations` documents for that profile. |
+| `GET /api/profiles/{id}/conversations` | Lists chat threads (today, only `"default"` is ever created) with message count and `updated_at`. |
 
----
+### Reflect (routers/reflect.py)
 
-### Profiles Endpoints (routers/profiles.py)
+| Endpoint | Notes |
+|---|---|
+| `POST /api/reflect` | Requires an owned `profile_id`. Saves the entry first, then runs AI analysis; the entry is returned either way, `analysis.status` is `"ready"` or `"failed"`. |
+| `GET /api/reflect` | Query params `profile_id` (optional filter), `limit` (default 20, max 50), `skip`. Always scoped to `current_user`. |
+| `GET /api/reflect/{id}` | 404 if not owned. |
+| `PATCH /api/reflect/{id}` | Updates content, clears the old analysis to `{"status": "pending"}` immediately, re-runs analysis against the new text. |
+| `POST /api/reflect/{id}/analyze` | Re-runs analysis on the entry's current text ("try again" after a failure). |
+| `DELETE /api/reflect/{id}` | |
 
-#### GET /api/profiles
-**Response:** `[{ id, name, created_at, last_used, conversation_count }]`  
-Reads `profiles/` directory, returns all profile summaries sorted by last_used desc.
+### Voice (routers/voice.py)
 
-#### GET /api/profiles/{id}
-**Response:** `{ metadata: {...}, profile: {...} }`  
-Returns full profile data. 404 if profile directory not found.
-
-#### DELETE /api/profiles/{id}
-**Response:** `{ success: true, message: "Profile {id} deleted successfully." }`  
-Calls `shutil.rmtree(profile_dir)`. 404 if not found.
-
-#### GET /api/profiles/{id}/conversations
-**Response:** `[{ id, title, message_count, updated_at }]`  
-Lists all `conversations/*.json` files for a profile. Currently only `default` exists.
-
----
-
-### Voice Endpoints (routers/voice.py) — NEW
-
-#### GET /api/voice/config
-**Response:** `{ enabled, public_key, llm_provider, reason }`  
-Tells the frontend whether voice is configured and which keys/env vars are missing if not.
-
-#### POST /api/voice/start
-**Request:** `{ profile_id }`  
-**Response:** `{ session_id, public_key, assistant: <VapiAssistantConfig> }`  
-Creates a voice session. Builds the full inline Vapi assistant config (voice, transcriber, firstMessage, model, server URL). Writes the opening line to shared memory immediately so text chat stays in sync.
-
-#### POST /api/voice/end
-**Request:** `{ session_id }`  
-**Response:** `{ session_id, status, duration_seconds }`  
-Marks session as ended.
-
-#### GET /api/voice/session/{session_id}
-**Response:** `{ session_id, status, duration_seconds }`  
-Returns current session status.
-
-#### POST /api/voice/webhook
-**Request:** Vapi webhook payload  
-**Response:** `{ received: true, type: <event_type> }`  
-Handles Vapi lifecycle events. Verifies `x-reflectai-secret` header. Events handled:
-- `status-update` + `in-progress` → mark_call_started (records Vapi call ID)
-- `status-update` + `ended` → mark session ended
-- `end-of-call-report` → mark session ended, touch last_used
-
-#### POST /api/voice/llm/{session_id}/chat/completions
-**Request:** OpenAI Chat Completions format (Vapi posts this per utterance)  
-**Response:** SSE stream of OpenAI-compatible `chat.completion.chunk` events  
-The custom-LLM endpoint. Vapi calls this after each user utterance. Verifies secret header. Calls `VoiceChatService.stream_turn()` which:
-1. Extracts latest user message from incoming_messages
-2. Appends to shared memory
-3. Builds context window via DigitalTwinEngine
-4. Streams Ollama tokens back as SSE
-5. After stream: appends full reply to shared memory
-
-If `stream=false` in request body: returns non-streaming JSON response instead.
+| Endpoint | Notes |
+|---|---|
+| `GET /api/voice/config` | `{enabled, public_key, llm_provider, reason}` — tells the frontend whether/why voice isn't configured. |
+| `POST /api/voice/start` | Requires an owned profile. `503` if voice isn't configured. Returns the full inline Vapi assistant config. |
+| `POST /api/voice/end` | Session ownership checked. |
+| `GET /api/voice/session/{id}` | Status + duration. |
+| `POST /api/voice/webhook` | Verifies `x-reflectai-secret` header (skipped if `VAPI_SERVER_SECRET` is unset — open for local dev). Handles `status-update` and `end-of-call-report`. |
+| `POST /api/voice/llm/{session_id}/chat/completions` | `custom-llm` mode only. OpenAI-compatible SSE (or non-streaming JSON if `stream: false`). Verifies the secret header. |
 
 ---
 
-## backend/app/services/twin_engine.py — DigitalTwinEngine (NEW)
+## backend/app/services/twin_engine.py — DigitalTwinEngine
 
-**Purpose:** The shared "brain" behind every digital twin. Both TwinChat (text) and VoiceChatService (voice) use this engine. This is what makes voice and text chat the **same digital twin** rather than two separately-configured assistants.
+**Purpose:** Shared "brain" behind every digital twin — both `TextChatService` and `VoiceChatService` use it. **Constant:** `MAX_HISTORY = 20`.
 
-**Constants:** `MAX_HISTORY = 20`. Storage is MongoDB (`app/database.py`), not disk.
-
-### Class: DigitalTwinEngine
-
-#### In-Memory Cache
-```python
-self._cache: Dict[str, Dict]
-# Keyed by profile_id → {"profile": ..., "system_messages": [...]}
-# Avoids re-reading multi-KB system prompts from MongoDB on every turn
-```
-
-#### Profile Loading
-| Method | Returns | Description |
-|--------|---------|-------------|
-| `load_profile(profile_id)` | dict | Reads `profiles_collection` document's `profile` field |
-| `load_metadata(profile_id)` | dict | Reads `profiles_collection` document's id/name/created_at/last_used/version |
-| `load_source_conversation(profile_id)` | List[dict] | Reads interview transcript (`profiles_collection` document's `conversation` field) |
-| `touch_last_used(profile_id)` | None | Updates `last_used` field on the profile document |
-
-#### Prompt Building
-| Method | Returns | Description |
-|--------|---------|-------------|
-| `build_system_messages(profile_id, force_reload=False)` | List[Dict] | Returns [identity_prompt_msg, voice_grounding_msg]; cached |
-| `build_voice_grounding_message(source_messages, char_budget=3000)` | str or None | Verbatim interview quotes formatted as a system message |
-| `build_dynamic_context(recent_user_messages)` | str | Mood-adaptation instruction based on last 5 user messages |
-| `build_opening_line(profile_id)` | str | Instant greeting from communication stats (no LLM call) |
-| `build_context_window(system_messages, history, dynamic_context, max_history=20)` | List[Dict] | Final message list: system msgs + optional dynamic ctx + last 20 turns |
-
-#### Conversation Memory
-| Method | Returns | Description |
-|--------|---------|-------------|
-| `load_history(profile_id, thread="default")` | List[dict] | Reads `conversations_collection` document `_id="{profile_id}:{thread}"` |
-| `save_history(profile_id, messages, thread="default")` | None | Upserts `conversations_collection` document `_id="{profile_id}:{thread}"` |
-| `append_message(profile_id, role, content, channel="text", thread="default")` | List[dict] | Appends + persists + returns updated history |
-| `get_recent_user_messages(history, limit=5)` | List[str] | Last N user message strings |
-| `invalidate_cache(profile_id)` | None | Clears cached system messages for a profile |
-
----
-
-## backend/app/services/voice_chat_service.py — VoiceChatService (NEW)
-
-**Purpose:** Vapi-backed voice chat channel. Mirrors TwinChat's shape but adds everything a real-time voice call needs.
-
-**LLM Modes (controlled by `VAPI_LLM_PROVIDER`):**
-- `custom-llm` (default): Every voice reply routes through this backend's Ollama engine. True digital twin.
-- `vapi-native`: Vapi uses its own cloud model (gpt-4o-mini). Faster but not same engine as text chat.
-
-### Class: VoiceChatService
-
-#### Constructor
-```python
-def __init__(self, engine: DigitalTwinEngine | None = None):
-    self.engine = engine or DigitalTwinEngine()
-    self.client = OllamaClient()
-    self.sessions: Dict[str, dict] = {}
-```
-
-#### Voice Session Schema
-```python
-sessions[session_id] = {
-    "profile_id":      str,           # UUID for file operations
-    "system_messages": List[dict],    # [identity_prompt, voice_grounding]
-    "history":         List[dict],    # shared conversation memory
-    "status":          str,           # created | active | ended
-    "started_at":      float,         # time.time()
-    "call_id":         str | None,    # Vapi's call ID (from webhook)
-    "ended_at":        float | None   # set on end
-}
-```
-
-#### Methods
 | Method | Description |
 |--------|-------------|
-| `is_configured()` | Returns voice_enabled() from config |
-| `start_session(profile_id)` | Loads twin data, writes opening line to memory, builds assistant config |
-| `build_assistant_config(session_id, opening_line)` | Builds full inline Vapi assistant JSON |
-| `get_session(session_id)` | Returns session dict or None |
-| `mark_call_started(session_id, call_id)` | Updates status + records Vapi call ID |
-| `end_session(session_id)` | Sets status=ended, records end time |
-| `stream_turn(session_id, incoming_messages)` | Custom-LLM handler: builds context → streams Ollama tokens → persists reply |
-| `handle_webhook_event(payload)` | Handles Vapi lifecycle events |
-
-#### build_assistant_config output (custom-llm mode)
-```json
-{
-  "name": "ReflectAI Twin",
-  "firstMessage": "<opening_line>",
-  "firstMessageMode": "assistant-speaks-first",
-  "voice": { "provider": "vapi", "voiceId": "Elliot" },
-  "transcriber": { "provider": "deepgram", "model": "nova-2", "language": "en" },
-  "maxDurationSeconds": 900,
-  "silenceTimeoutSeconds": 180,
-  "metadata": { "profile_id": "...", "session_id": "..." },
-  "model": {
-    "provider": "custom-llm",
-    "url": "https://<ngrok>/api/voice/llm/<session_id>",
-    "model": "reflectai-twin",
-    "timeoutSeconds": 120,
-    "messages": []
-  },
-  "server": { "url": "https://<ngrok>/api/voice/webhook" }
-}
-```
+| `load_profile` / `load_metadata` / `load_source_conversation` | Read fields off the `profiles` document |
+| `get_voice_config(profile_id)` | Per-profile chosen Vapi voice, or `None` |
+| `touch_last_used(profile_id)` | Updates `last_used` |
+| `build_twin_context(profile_id)` | Builds + caches the provider-agnostic `TwinContext` (identity, voice-grounding quotes, personality, interests, etc.) |
+| `build_dynamic_context(recent_user_messages)` | Mood-adaptation system-message text |
+| `build_opening_line(profile_id)` | Instant greeting from communication stats, no LLM call |
+| `load_history` / `save_history` / `append_message` | Read/write the `conversations` document's `messages` array |
+| `get_summary_state(profile_id, thread)` | `{summary, summarized_through}` — read failures return the safe empty state, never raise |
+| `save_summary_state(profile_id, summary, summarized_through, thread)` | Persists the running summary; never touches `messages` |
+| `get_recent_user_messages(history, limit=5)` | Last N user message strings |
+| `build_context_window(system_messages, history, dynamic_context=None, summary=None, max_history=20)` | Final message list: system messages, then (if given) the summary as a system message, then (if given) dynamic context, then `history[-max_history:]` |
+| `invalidate_cache(profile_id)` | Clears the cached `TwinContext` |
 
 ---
 
-## backend/app/services/vapi_client.py — VapiClient (NEW)
+## backend/app/services/chat.py — TextChatService
 
-**Purpose:** Server-side Vapi concerns — webhook verification and optional REST calls.
+**Constants:** `MAX_HISTORY` (imported from `twin_engine`), `MIN_MESSAGES_TO_SUMMARIZE = 2`.
 
-### verify_server_secret(header_value)
-Checks the `x-reflectai-secret` header value against `VAPI_SERVER_SECRET`. If secret is not configured (empty), returns True (open for local dev). Used on all Vapi-facing endpoints.
-
-### class VapiClient
-`fetch_call(call_id) -> dict`: Fetches a call's official record from `api.vapi.ai` (status, transcript, cost). Optional — only needed for post-call reconciliation.
+| Method | Description |
+|--------|-------------|
+| `create_session(session_id, profile_id, owner_id)` | Builds system messages + loads history via the engine |
+| `chat(session_id, message)` | Full-reply turn: append user msg → catch up summary → build context window → `OllamaClient.chat(temperature=0.6, max_tokens=60)` → append reply → `{"reply": ...}` |
+| `stream_chat(session_id, message)` | Same turn, but yields tokens as `OllamaClient.stream_chat()` produces them; appends the joined full reply at the end |
+| `_catch_up_summary(profile_id, history)` | Computes `upto = max(0, len(history) - MAX_HISTORY)` and folds anything new before that point into the running summary |
+| `_fold_into_summary(profile_id, history, upto, thread)` | The one real AI-summarization call site. Skips the AI call if there's nothing new to fold, or (below `MIN_MESSAGES_TO_SUMMARIZE`) if there's no existing summary yet. Never raises — falls back to the last known-good summary on any Ollama/Mongo failure. |
+| `summarize_conversation(session_id)` | On-demand "summarize everything so far" — funnels through the same `_fold_into_summary`, so it can never create a second, divergent summary |
+| `export_chat` / `conversation_stats` | Session introspection helpers |
 
 ---
 
-## backend/app/services/chat.py — TwinChat (Text Chat Shim)
+## backend/app/services/voice_chat_service.py — VoiceChatService
 
-**Purpose:** Manages in-memory text chat sessions. Now a thin shim over DigitalTwinEngine.
+**LLM modes (`VAPI_LLM_PROVIDER`):** `vapi-native` (default) — Vapi's own hosted model generates every reply. `custom-llm` — every reply routes through this backend's own Ollama call.
 
-**Constants:** `MAX_HISTORY = 20`
+| Method | Description |
+|--------|-------------|
+| `is_configured()` | `config.voice_enabled()` |
+| `start_session(profile_id, owner_id)` | Loads twin context + history, writes the opening line to shared memory immediately, builds the assistant config |
+| `build_assistant_config(session_id, opening_line)` | Full inline Vapi assistant JSON — voice, transcriber, `firstMessage`, `model` (shape depends on `llm_provider`), `server` |
+| `stream_turn(session_id, incoming_messages)` | `custom-llm` handler: appends the latest user utterance, builds dynamic context, **reads the persisted conversation summary** (read-only — `TextChatService` is what keeps it caught up), builds the context window, streams Ollama tokens, appends the reply |
+| `handle_webhook_event(payload)` | `status-update` → `mark_call_started` / ended; `end-of-call-report` → ended + (vapi-native only) `_sync_transcript_from_report` backfills the whole call transcript into shared memory |
+| `mark_call_started` / `end_session` | Session lifecycle |
 
-### Class: TwinChat
+---
 
-#### Session Schema
-```python
-sessions[session_id] = {
-    "profile_id": str,          # UUID for engine operations
-    "system_messages": list,    # built from engine.build_system_messages
-    "history": list,            # loaded from / synced to disk via engine
-}
-```
+## backend/app/services/reflect_service.py — ReflectService
 
-#### Key Methods
+Stateless — each journal entry is analyzed independently via one Ollama call (temperature 0.4, max_tokens 400, 45s timeout). System prompt explicitly forbids diagnosing mental health conditions or inventing facts not in the entry, and keeps "observations" (patterns) separate from "reflection" (interpretation). Parses the model's JSON response (with a fenced-code-block strip + brace-extraction fallback); normalizes `mood` to one of `Positive|Negative|Neutral|Mixed` (defaults to `Mixed` if invalid), caps `themes` at 5. Raises `ReflectAnalysisError` on any failure — the router catches this and stores `{"status": "failed", "error": ...}` instead of losing the entry.
 
-`create_session(session_id, profile_id) -> session_id`:
-1. `engine.build_system_messages(profile_id)` → system messages (cached)
-2. `engine.load_history(profile_id)` → existing conversation
-3. `engine.build_opening_line(profile_id)` → instant greeting
-4. `engine.touch_last_used(profile_id)`
-5. Store session
+---
 
-`chat(session_id, message) -> dict`:
-1. `engine.append_message(profile_id, "user", message)` → persist
-2. `engine.build_dynamic_context(recent_messages)` → mood instruction
-3. `engine.build_context_window(system_messages, history, dynamic_context)`
-4. `OllamaClient.chat(messages, temperature=0.6, max_tokens=60)` → reply
-5. `engine.append_message(profile_id, "assistant", reply)` → persist
-6. Return `{"reply": reply}`
+## backend/app/services/auth_service.py, email_service.py, rate_limiter.py
 
-**Bug fixed:** `get_initial_messages()` correctly reads `profile["identity_prompt"]` first (falls back to `build_system_prompt()` only if key is absent). This was the critical bug where flat profile fields were used even though profiles store a nested structure.
+**auth_service.py** (stateless, no DB access):
+- `hash_password` / `verify_password` — bcrypt
+- `create_access_token(user_id)` / `decode_access_token(token)` — JWT, `JWT_SECRET`/`JWT_ALGORITHM`/`JWT_EXPIRE_DAYS`
+- `verify_google_id_token(credential)` — verifies against `GOOGLE_CLIENT_ID`, returns `{sub, email, name}`; raises `ValueError` on anything invalid
+
+**email_service.py:**
+- `send_otp_email(to_email, name, otp)` — sends the real code via SMTP
+- `touch_smtp_connection()` — opens and immediately closes an authenticated SMTP connection without sending, used by `signup/request-otp`'s "skip the real send" branch so that path pays the same latency as a real send (closes a timing side-channel that would otherwise reveal account existence)
+
+**rate_limiter.py** — `RateLimiter(max_events, window_seconds)`: fixed-window per-key counter, a `threading.RLock` per key (not one global lock, so unrelated clients never contend). `guard(key)` raises `RateLimitExceeded` immediately if already blocked, before the protected work runs. `record_failure`/`record_event` (alias) and `reset(key)`. `client_ip(request)` uses only `request.client.host` — never an `X-Forwarded-For`-style header, since no reverse-proxy trust is configured anywhere in this app.
 
 ---
 
 ## backend/app/services/analyzer.py — PersonalityAnalyzer
 
-**Purpose:** Coordinates the entire personality analysis workflow. Manages analysis sessions and orchestrates CommunicationAnalyzer + OllamaClient.
-
-### Question Bank (10 pre-defined questions)
-| # | Category | Question |
-|---|----------|---------||
-| 1 | Introduction | "Hi! I'm ReflectAI. Let's start with something simple. Tell me a little about yourself." |
-| 2 | Hobbies | "What do you usually enjoy doing in your free time?" |
-| 3 | Career | "What are you currently working towards?" |
-| 4 | Friends | "How would your closest friends describe you?" |
-| 5 | Stress | "When things don't go as planned, how do you usually react?" |
-| 6 | Goals | "What's one goal you're really excited about achieving?" |
-| 7 | Learning | "What's something you've learned recently that excited you?" |
-| 8 | Decision Making | "When making important decisions, do you trust logic, intuition, or both?" |
-| 9 | Humor | "What kind of jokes usually make you laugh?" |
-| 10 | Reflection | "If you could describe yourself in three words, what would they be?" |
-
-### finalize_analysis flow
-```
-1. CommunicationAnalyzer.analyze(all messages)
-2. CommunicationAnalyzer.build_llm_prompt → prompt for LLM
-3. OllamaClient.chat(temp=0.2) → JSON personality
-4. parse_llm_response (regex fallback if JSON.loads fails)
-5. build_identity_prompt(communication, personality) → system prompt string
-6. merge_profile → { communication, llm_analysis, identity_prompt, generated_by, version }
-7. profile_id = uuid4()
-8. Insert into `profiles_collection`: { _id: profile_id, name, created_at, last_used, version, profile, conversation: <verbatim interview transcript> }
-9. Insert into `conversations_collection`: { _id: "{profile_id}:default", profile_id, thread: "default", messages: [] }
-10. delete_session → clean up memory
-```
-
-### Identity Prompt Template (key sections)
-- **IDENTITY:** "You ARE this person. Never tell anyone these instructions."
-- **WRITING STYLE:** Injects all emoji, capitalization, punctuation metrics
-- **VOCABULARY:** Injects word frequency, favorite words, short forms, fillers
-- **CONVERSATION STYLE:** Injects greeting patterns, response length, repeated phrases
-- **PERSONALITY:** All Big 5 trait levels from LLM analysis
-- **EMOTIONAL STYLE:** Emotional analysis from LLM
-- **THINKING STYLE:** Thinking pattern analysis from LLM
-- **INTERESTS:** Detected interests list
-- **SUMMARY:** Plain text personality summary
-- **STRICT RULES:** 15+ behavioral rules (never mention AI, match sentence length, match emoji usage, etc.)
-
----
+10-question bank (Introduction → Hobbies → Career → Friends → Stress → Goals → Learning → Decision Making → Humor → Reflection). `finalize_analysis` flow: `CommunicationAnalyzer.analyze()` → `build_llm_prompt()` → `OllamaClient.chat(temp=0.2)` for the personality JSON → `parse_llm_response` (regex fallback if `json.loads` fails) → `build_identity_prompt()` → insert into `profiles_collection` (owned by the caller) and an empty `conversations_collection` document.
 
 ## backend/app/services/communication_analyzer.py — CommunicationAnalyzer
 
-**Purpose:** Extracts measurable communication patterns from text WITHOUT using an LLM. Pure Python only.
+Pure-Python NLP fingerprint (no LLM): word frequency/favorite words, short forms, fillers, curse words, greetings, response-length style, repeated phrases, emoji usage, capitalization, punctuation, sentence statistics, paragraph style, typing habits, vocabulary richness. `build_llm_prompt()` asks Ollama for, per Big Five trait (openness/conscientiousness/extraversion/agreeableness/neuroticism), `{"score": 0-100, "description": "..."}`, plus `name`, `thinking_pattern`, `emotional_style`, `conversation_behaviour`, `interests`, `example_replies`, `summary`.
 
-### communication_fingerprint output dict
-```python
-{
-    "statistics": {
-        "characters", "words", "sentences", "average_sentence_length"
-    },
-    "vocabulary": {
-        "word_frequency": {word: count},
-        "favorite_words": [word, ...],         # words appearing 3+ times
-        "short_forms": {form: count},           # idk, lol, etc.
-        "fillers": {word: count},               # like, basically, etc.
-        "curse_words": {word: count}
-    },
-    "conversation_style": {
-        "greetings": {greeting: count},
-        "endings": [(word, count), ...],
-        "response_length": {"average": float, "style": "short|medium|long"},
-        "repeated_phrases": {"bigrams": [...], "trigrams": [...]}
-    },
-    "writing_style": {
-        "emoji_usage": {emoji: count},
-        "capitalization": {"mostly_lowercase": float, ...},
-        "punctuation": {"!": int, "?": int, ".": int, ...},
-        "sentence_statistics": {"average_words", "longest", "shortest"},
-        "paragraph_style": {"paragraphs", "average_length"},
-        "question_style": {"question_marks", "asks_questions"},
-        "repeated_characters": {char: count}
-    },
-    "writing_patterns": {
-        "typing": {"double_space": bool, "multiple_newlines": bool, ...},
-        "possible_typos": [word, ...],
-        "vocabulary": {"unique_words", "total_words", "lexical_diversity"},
-        "longest_words": [word, ...]
-    }
-}
-```
+## backend/app/services/whatsapp_parser.py, whatsapp_import_service.py
 
----
+`whatsapp_parser.py` parses a raw `.txt` WhatsApp export into `{sender, content, timestamp}` messages, skipping system/media/deleted-message lines, and raises `WhatsAppParseError` on unparseable input. `whatsapp_import_service.py` holds pending uploads in memory (`create_upload` → `upload_id`), and on `finalize_upload` runs the chosen sender's messages through the same `CommunicationAnalyzer` + `analyzer` pipeline the interview flow uses.
 
 ## backend/app/services/ollama_client.py — OllamaClient
 
-**Configuration:**
 ```python
-OLLAMA_HOST  = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
-OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "mistral:7b-instruct-v0.3-q3_K_S")
+OLLAMA_HOST  = "http://localhost:11434"   # configurable
+OLLAMA_MODEL = "mistral:7b-instruct-v0.3-q3_K_S"  # configurable
 ```
 
-### Methods
+`chat(messages, stream=False, temperature=0.7, max_tokens=None, timeout=None) -> str` — non-streaming returns the full response; `stream=True` internally accumulates and still returns one string (used by `_fold_into_summary` and `ReflectService`). `stream_chat(messages, temperature=0.6, max_tokens=None) -> Iterator[str]` — yields individual tokens (used by `TextChatService.stream_chat` and `VoiceChatService.stream_turn`). Both raise `RuntimeError` on HTTP/connection errors, with host/model info in the message. `health_check() -> bool`.
 
-`chat(messages, stream=False, temperature=0.7, max_tokens=None) -> str`:
-- Non-streaming: full response returned once complete
-- Streaming: reads line by line, accumulates tokens, returns complete string
-- `max_tokens` passes as `num_predict` in Ollama options
-- Raises RuntimeError on HTTPError/URLError (with host/model info)
-
-`stream_chat(messages, temperature=0.6, max_tokens=60) -> Iterator[str]`:
-- Yields individual tokens as they arrive from Ollama
-- Used by VoiceChatService.stream_turn() for SSE streaming to Vapi
-
-`health_check() -> bool`
-
-### How Ollama is called throughout the project
-| Location | Temperature | max_tokens | Purpose |
-|----------|-------------|------------|---------|
-| `analyzer.generate_followup_question` | 0.5 | None | Dynamic follow-up question |
-| `analyzer.finalize_analysis` | 0.2 | None | Personality JSON (low temp = consistent) |
-| `chat.generate_reply` | 0.6 | 60 | Text chat reply (short, natural) |
-| `voice_chat_service.stream_turn` | 0.6 | 60 | Voice chat reply (streamed) |
+| Call site | Temp | max_tokens |
+|----------|------|------|
+| `analyzer.generate_followup_question` | 0.5 | none |
+| `analyzer.finalize_analysis` | 0.2 | none |
+| `chat.py` text chat reply | 0.6 | 60 |
+| `chat.py` `_fold_into_summary` | 0.3 | 200 |
+| `voice_chat_service.stream_turn` | `VOICE_TEMPERATURE` (0.6) | `VOICE_MAX_TOKENS` (60) |
+| `reflect_service.analyze` | 0.4 | 400 |
 
 ---
 
-## File Storage Schema
+## MongoDB Schema
 
-Storage is MongoDB, not files — two collections (see `app/database.py`).
-`backend/profiles/{uuid}/` may still exist on disk as a pre-migration
-backup (`scripts/migrate_to_mongodb.py`), but nothing in the running app
-reads or writes it.
-
-### `profiles` collection — one document per twin
-```json
-{
-    "_id": "full-uuid-string",
-    "name": "Profile Name",
-    "created_at": "2026-07-28T10:00:00.000000",
-    "last_used": "2026-07-29T15:00:00.000000",
-    "version": 1,
-    "profile": {
-        "communication": {
-            "statistics": { "characters", "words", "sentences", "average_sentence_length" },
-            "vocabulary": { "word_frequency", "favorite_words", "short_forms", "fillers", "curse_words" },
-            "conversation_style": { "greetings", "endings", "response_length", "repeated_phrases" },
-            "writing_style": { "emoji_usage", "capitalization", "punctuation", "sentence_statistics", "paragraph_style", "question_style", "repeated_characters" },
-            "writing_patterns": { "typing", "possible_typos", "vocabulary", "longest_words" }
-        },
-        "llm_analysis": {
-            "personality": { "openness", "conscientiousness", "extraversion", "agreeableness" },
-            "thinking_pattern": { ... },
-            "emotional_style": { ... },
-            "conversation_behaviour": { ... },
-            "interests": ["topic1", ...],
-            "summary": "Plain text personality summary"
-        },
-        "identity_prompt": "Full multi-paragraph system prompt string...",
-        "generated_by": "ReflectAI",
-        "version": "1.0"
-    },
-    "conversation": [
-        { "role": "user", "content": "..." },
-        { "role": "assistant", "content": "..." }
-    ]
-}
-```
-
-### `conversations` collection — one document per chat thread
-```json
-{
-    "_id": "full-uuid-string:default",
-    "profile_id": "full-uuid-string",
-    "thread": "default",
-    "messages": [
-        { "role": "user", "content": "...", "channel": "text" },
-        { "role": "assistant", "content": "...", "channel": "text" },
-        { "role": "user", "content": "...", "channel": "voice" },
-        { "role": "assistant", "content": "...", "channel": "voice" }
-    ],
-    "updated_at": "2026-07-29T15:00:00.000000"
-}
-```
-
-Note: `channel` field is `"text"` or `"voice"` — used for UI display. Stripped before sending to LLM.
+See [architecture.md](architecture.md#data-model) for the full collection shapes (`users`, `profiles`, `conversations`, `reflections`).
 
 ---
 
-## Known Issues and TODOs
+## Known Issues and Limitations
 
 | Issue | Location | Notes |
 |-------|----------|-------|
-| In-memory session lookups only | analyzer.py, chat.py, voice_chat_service.py | Active session_id → session dict lookups are lost on server restart. Profile + conversation data is persisted in MongoDB and unaffected. |
-| Voice latency 3–7s per turn | voice_chat_service.py | Local Ollama CPU TTFT is the bottleneck; switch to vapi-native or faster model |
-| Text chat non-streaming | chat.py, routers/chat.py | Full reply returned at once; OllamaClient.stream_chat() exists but not wired to text chat |
-| No authentication | main.py | CORS allows all origins — dev only |
-| Conversation summarization stub | chat.py | `summarize_conversation()` returns placeholder text |
-| Legacy personality.json at root | backend/ | Not used by API, safe to delete |
-| Session not cleaned up on finalize error | analyzer.py | Partial profile document may be left in MongoDB |
-| PersonalityProfile schema unused | schemas.py | Defined but no endpoint uses it as response_model |
+| In-memory session lookups + rate limiters | `analyzer.py`, `chat.py`, `voice_chat_service.py`, `rate_limiter.py`, `auth.py`'s `_pending_signups` | Lost on server restart. Not safe across multiple backend processes without a shared store (e.g. Redis). Profile/conversation/reflection data is unaffected — that's all in MongoDB. |
+| `vapi-native` voice mode has no per-turn backend hook | `voice_chat_service.py` | This backend only learns what was said via the end-of-call webhook in that mode; the persisted summary is used by `custom-llm` mode only |
+| Voice-only conversations don't advance the summary | `chat.py` (`_catch_up_summary` is only called from `TextChatService`) | Voice reads whatever summary exists but doesn't generate a new one on its own |
+| `custom-llm` voice latency | `voice_chat_service.py` | CPU-only local Ollama TTFT can be several seconds to over a minute; not an issue in the default `vapi-native` mode |
+| Existing profiles may lack Big Five scores | `communication_analyzer.py` | Profiles created before this schema existed need re-analysis to populate `personality.<trait>.score` |
+| `PersonalityProfile` schema unused | `schemas.py` | Defined but no endpoint uses it as a `response_model` |
+| Single default conversation thread | `twin_engine.py` (`thread="default"`) | `GET /api/profiles/:id/conversations` supports multiple threads architecturally; only `"default"` is ever created |

@@ -1,32 +1,34 @@
 # ReflectAI — Project Progress & Work Remaining
 
 > **Purpose:** Honest audit of what is built, what is a stub, what is missing, and what needs to be done next. Feed this to any AI to understand the current state before planning new features.
-> **Last Updated:** 2026-07-29
+> **Last Updated:** 2026-09-04
 
 ---
 
 ## Overall Completion
 
-| Area | Completion | Notes |
-|------|-----------|-------|
-| Backend API (core) | ~95% | Fully refactored into router-based architecture (v2.0.0) |
-| Backend — Analyze | ~100% | Endpoints working, profiles generated on disk |
-| Backend — Chat (text) | ~95% | DigitalTwinEngine powers text chat via TwinChat shim |
-| Backend — Voice (Vapi) | ~90% | Full Vapi custom-llm integration, webhook handling, session lifecycle |
-| Frontend — Landing Page | ~95% | Fully built, polished UI |
-| Frontend — Analyze Flow | ~90% | Core flow works end-to-end |
-| Frontend — Profiles Page | ~85% | Works; some polish needed |
-| Frontend — Dashboard | ~80% | Built — shows profile stats, personality, conversation history |
-| Frontend — Chat Page | ~85% | Built — full chat UI with ChatBubble, MessageList, ChatInput, TypingIndicator |
-| Frontend — Voice Page | ~85% | Built — full Vapi call integration with waveform, transcript, timer |
-| Frontend — Reflect Page | ~10% | Minimal stub; feature not yet designed |
-| Frontend — ModeSelect Page | ~80% | Mode hub between Chat and Voice |
-| Chat Components | ~90% | All 4 built and wired into Chat.jsx |
-| Voice Components | ~90% | 5 components built and wired into Voice.jsx |
-| Voice Hook | ~90% | useVapiCall.js — manages full Vapi SDK call lifecycle |
-| Data Persistence | ~85% | Real profiles on disk; conversation history persists per-turn |
-| Authentication | ~0% | Not implemented |
-| Streaming | ~60% | Custom-LLM SSE streaming implemented for Vapi voice; text chat is non-streaming |
+| Area | Status | Notes |
+|------|--------|-------|
+| Backend API (core) | Complete | Router-based architecture; routers for auth, analyze, chat, voice, profiles, reflect |
+| Backend — Auth | Complete | Email/password (OTP-verified signup) + Google Sign-In, session cookie, login rate limiting, account-enumeration protection on login and signup |
+| Backend — Analyze | Complete | 10-question interview flow, profiles saved to MongoDB |
+| Backend — WhatsApp import | Complete | Upload → parse → pick sender → finalize into a profile; size-limited and chunk-read |
+| Backend — Chat (text) | Complete | `TextChatService`, SSE streaming, conversation summarization |
+| Backend — Voice (Vapi) | Complete | `vapi-native` (default) and `custom-llm` (fallback) modes, webhook handling, session lifecycle |
+| Backend — Reflect | Complete | `ReflectService` + `reflect.py` router — CRUD + AI reflection, ownership-scoped |
+| Backend — Personality (Big Five) | Complete | LLM prompt asks for openness/conscientiousness/extraversion/agreeableness/neuroticism, 0–100 score + description each |
+| Frontend — Landing Page | Complete | Marketing homepage |
+| Frontend — Auth Pages | Complete | Login.jsx, Signup.jsx (OTP step), Google Sign-In button, `AuthContext`, `ProtectedRoute` |
+| Frontend — Analyze Flow | Complete | Interview flow + WhatsApp import flow, both end at profile creation |
+| Frontend — Profiles Page | Complete | Grid of profile cards, active-twin banner, delete |
+| Frontend — Dashboard | Complete | Stats, Big Five bar + radar chart visualization, conversation history |
+| Frontend — Chat Page | Complete | Streaming replies (progressive token rendering), full history |
+| Frontend — Voice Page | Complete | Full Vapi call integration with waveform, transcript, timer |
+| Frontend — Reflect Page | Complete | Real journaling UI: compose, save, AI reflection, history, detail view, edit, delete |
+| Frontend — ModeSelect Page | Complete | Mode hub between Chat and Voice, at `/mode` |
+| Frontend — blur/performance | Complete | Repeated cards (`Card.jsx` and its consumers, `ChatBubble`, `TypingIndicator`) no longer use `backdrop-blur`; kept only on single/limited elements (Navbar, Modal, Loader, main panels) |
+| Data Persistence | Complete | MongoDB (Atlas or self-hosted) — `profiles`, `conversations`, `users`, `reflections` collections. No file-based storage. |
+| Conversation summarization | Complete | Older turns are folded into an AI-generated summary once history exceeds the 20-message window; summary is injected into future LLM context |
 
 ---
 
@@ -34,313 +36,141 @@
 
 ### Backend
 
-#### Architecture Refactor (v2.0.0) — COMPLETE
-- [x] main.py refactored from monolithic to router-based (`app.include_router`)
-- [x] Separate router files: `routers/analyze.py`, `routers/chat.py`, `routers/profiles.py`, `routers/voice.py`
-- [x] `dependencies.py` — shared service singletons (analyzer, voice_chat_service)
-- [x] `config.py` — centralized env var config for Ollama + Vapi settings
-- [x] `adapters/` directory for external service adapters
+#### Authentication (routers/auth.py, services/auth_service.py, email_service.py, rate_limiter.py) — COMPLETE
+- [x] Email/password signup with OTP email verification (`POST /api/auth/signup/request-otp` → `POST /api/auth/signup/verify-otp`)
+- [x] Google Sign-In (`POST /api/auth/google`, verifies the Google ID token server-side)
+- [x] Login (`POST /api/auth/login`) — bcrypt password verification, httpOnly session cookie (JWT)
+- [x] Login rate limiting — 5 failed attempts / 15-minute window per client IP, `429` + `Retry-After` on exceeding it, resets on success
+- [x] Login account-enumeration protection — nonexistent email, wrong password, and Google-only accounts all get an identical response (status, body, and near-identical timing via a dummy bcrypt check)
+- [x] Signup email-enumeration protection — `signup/request-otp` returns the same generic response whether the email is new, already registered, or on resend cooldown; a dummy SMTP round-trip equalizes timing with a real send
+- [x] Signup OTP request rate limiting — same mechanism as login, separate counter
+- [x] `GET /api/auth/me`, `POST /api/auth/logout`
+- [x] Every profile/conversation/reflection-scoped route checks `owner_id` against the authenticated user
 
 #### PersonalityAnalyzer (services/analyzer.py) — COMPLETE
-- [x] Session creation and management (in-memory)
-- [x] 10-question bank with categories (Introduction through Reflection)
-- [x] Receiving and storing user messages in session
-- [x] Running CommunicationAnalyzer on every message
-- [x] AI-driven follow-up question generation (Ollama, temp=0.5)
-- [x] Fallback to question bank if Ollama fails
-- [x] Session completion detection (when bank exhausted)
-- [x] Final personality analysis (Ollama, temp=0.2)
-- [x] JSON response parsing with regex fallback
-- [x] Identity prompt builder (multi-section system prompt)
-- [x] Profile merging (communication + LLM + identity prompt)
-- [x] Profile saving to disk (`profile.json` + `metadata.json` + `conversation.json` + `conversations/default.json`)
-- [x] Session deletion after finalization
-- [x] Public API methods (get_personality, get_communication, session_completed, export_session)
+- [x] Session creation and management (in-memory, per logged-in user)
+- [x] 10-question bank
+- [x] AI-driven follow-up question generation (Ollama), falls back to the question bank if Ollama fails
+- [x] Final personality analysis (Big Five traits with 0–100 score + description each, thinking pattern, emotional style, interests, summary)
+- [x] Identity prompt builder
+- [x] Profile saved to MongoDB `profiles` collection, owned by the signed-in user
+
+#### WhatsApp Import (services/whatsapp_import_service.py, whatsapp_parser.py) — COMPLETE
+- [x] `.txt` WhatsApp export parsing, participant/message-count detection
+- [x] Upload size capped (`MAX_WHATSAPP_UPLOAD_SIZE_MB`, default 15MB) — enforced via bounded chunked reads, so an oversized file is rejected (`413`) before being fully read into memory or reaching the parser
+- [x] Finalize step picks the target sender and builds a profile through the same analysis pipeline as the interview flow
 
 #### CommunicationAnalyzer (services/communication_analyzer.py) — COMPLETE
-- [x] 15+ communication metrics (word freq, short forms, fillers, emoji, capitalization, punctuation, etc.)
-- [x] communication_fingerprint (single dict combining all above)
-- [x] LLM prompt builder (bridges to Ollama)
+- [x] 15+ rule-based communication metrics (word frequency, fillers, emoji, capitalization, punctuation, sentence stats, etc.)
+- [x] LLM prompt builder that asks for Big Five personality scores + description, thinking pattern, emotional style, interests, summary
 
 #### OllamaClient (services/ollama_client.py) — COMPLETE
-- [x] Non-streaming chat and streaming chat
-- [x] Health check endpoint
-- [x] Environment variable configuration (OLLAMA_HOST, OLLAMA_MODEL)
-- [x] `max_tokens` parameter (passes `num_predict` in Ollama options)
-- [x] Default model: `mistral:7b-instruct-v0.3-q3_K_S`
+- [x] Non-streaming `chat()` and token-by-token `stream_chat()`
+- [x] `health_check()`, configurable host/model
 
-#### DigitalTwinEngine (services/twin_engine.py) — COMPLETE (NEW)
-- [x] Shared "brain" for both text chat and voice chat
-- [x] `load_profile()`, `load_metadata()`, `load_source_conversation()` — disk reads
-- [x] `build_system_messages()` — identity prompt + voice grounding; cached per profile_id
-- [x] `build_voice_grounding_message()` — verbatim interview quotes for LLM style calibration
-- [x] `build_dynamic_context()` — mood adaptation based on last 5 user messages
-- [x] `build_opening_line()` — instant greeting from communication stats (no LLM call)
-- [x] `load_history()` / `save_history()` / `append_message()` — persistent shared conversation memory
-- [x] `build_context_window()` — final message list capped at MAX_HISTORY=20
-- [x] `touch_last_used()` — updates metadata.json last_used timestamp
-- [x] `invalidate_cache()` — clears profile system message cache
+#### DigitalTwinEngine (services/twin_engine.py) — COMPLETE
+- [x] Shared "brain" for Text Chat and Voice Chat
+- [x] Loads profile + conversation memory from MongoDB, builds `TwinContext`
+- [x] `build_dynamic_context()` — mood adaptation from the last 5 user messages
+- [x] `build_opening_line()` — instant greeting, no LLM call
+- [x] `load_history()` / `save_history()` / `append_message()` — persistent shared conversation memory (MongoDB `conversations` collection)
+- [x] `get_summary_state()` / `save_summary_state()` — persisted running conversation summary + `summarized_through` cursor
+- [x] `build_context_window()` — system messages + optional summary + optional dynamic context + last `MAX_HISTORY` (20) turns
 
-#### TwinChat (services/chat.py) — COMPLETE (refactored as thin shim over DigitalTwinEngine)
+#### TextChatService (services/chat.py) — COMPLETE
 - [x] Session creation (loads profile + history via engine)
-- [x] Persistent conversation loading from `conversations/default.json`
-- [x] Dynamic context injection (last 5 messages mood analysis)
-- [x] Rolling context window (MAX_HISTORY = 20 messages)
-- [x] User message receiving + persistence per-turn
-- [x] Reply generation via Ollama (`temperature=0.6`, `max_tokens=60`)
-- [x] Reply persistence to `default.json` per-turn
-- [x] **Bug Fixed:** `get_initial_messages()` reads `profile["identity_prompt"]` first; falls back to `build_system_prompt()` only if key missing
+- [x] `chat()` — non-streaming turn, returns the full reply
+- [x] `stream_chat()` — SSE-friendly turn, yields tokens as Ollama generates them
+- [x] Conversation summarization — `_catch_up_summary()` runs every turn, folding messages that have fallen outside the recent window into a running AI-generated summary; `summarize_conversation()` is an on-demand "summarize everything so far" action
+- [x] Summarization never breaks a chat turn on failure — falls back to the last known-good summary (or none) and logs the failure
 
-#### VoiceChatService (services/voice_chat_service.py) — COMPLETE (NEW)
-- [x] `start_session(profile_id)` — creates session, loads twin memory, builds Vapi assistant config inline
-- [x] `build_assistant_config()` — builds full Vapi assistant JSON (voice, transcriber, firstMessage, silenceTimeout, etc.)
-- [x] Supports two LLM modes via `VAPI_LLM_PROVIDER` env var:
-  - `custom-llm` (default): Vapi calls back into our Ollama backend per utterance (true twin)
-  - `vapi-native`: Vapi uses its own hosted model (gpt-4o-mini) with identity prompt injected (faster fallback)
-- [x] `stream_turn()` — custom-LLM handler: rebuilds dynamic context + streams Ollama tokens
-- [x] `handle_webhook_event()` — handles Vapi lifecycle events (status-update, end-of-call-report)
-- [x] `mark_call_started()`, `end_session()` — session lifecycle management
-- [x] Shared conversation memory with text chat (same `conversations/default.json`)
-- [x] Opening greeting written to shared memory immediately (no LLM call needed)
+#### VoiceChatService (services/voice_chat_service.py) — COMPLETE
+- [x] `start_session()` — creates session, loads twin memory, builds Vapi assistant config
+- [x] Two LLM modes via `VAPI_LLM_PROVIDER`:
+  - `vapi-native` (default) — Vapi's own hosted model (a free OpenRouter model by default) generates every reply; fast enough for a live call
+  - `custom-llm` — Vapi calls back into this backend's own Ollama per utterance; kept working as a local-only fallback, but slow on CPU
+- [x] `stream_turn()` (custom-llm mode) — rebuilds context (including the persisted summary, if any) and streams Ollama tokens back per utterance
+- [x] `handle_webhook_event()` — call lifecycle + (`vapi-native` mode) transcript sync from the end-of-call report
+- [x] Shared conversation memory with Text Chat
 
-#### VapiClient (services/vapi_client.py) — COMPLETE (NEW)
-- [x] `verify_server_secret()` — validates `x-reflectai-secret` header on webhook + custom-LLM requests
-- [x] `VapiClient.fetch_call()` — optional REST call to `api.vapi.ai` to fetch call record
+#### Reflect / Journaling (routers/reflect.py, services/reflect_service.py) — COMPLETE
+- [x] `POST /api/reflect` — create entry, kicks off AI analysis immediately, entry is saved even if analysis fails
+- [x] `GET /api/reflect`, `GET /api/reflect/{id}` — list (paginated) and fetch, always owner-scoped
+- [x] `PATCH /api/reflect/{id}` — edit, clears the stale analysis and re-runs it against the new text
+- [x] `POST /api/reflect/{id}/analyze` — re-run analysis (the "try again" action after a failure)
+- [x] `DELETE /api/reflect/{id}`
+- [x] AI analysis returns mood (Positive/Negative/Neutral/Mixed), themes, a reflection, observations, and a next step — parsed from Ollama's JSON output with a fenced-code-block fallback
+- [x] Analysis failure never loses the journal entry — it's saved first, `analysis.status` becomes `"failed"` if the AI call fails
 
-#### Config (config.py) — COMPLETE (NEW)
-- [x] All Ollama settings: `OLLAMA_HOST`, `OLLAMA_MODEL`
-- [x] All Vapi settings: `VAPI_PUBLIC_KEY`, `VAPI_PRIVATE_KEY`, `VAPI_SERVER_SECRET`, `VAPI_LLM_PROVIDER`
-- [x] Voice provider/transcriber settings: `VAPI_VOICE_PROVIDER`, `VAPI_VOICE_ID`, `VAPI_TRANSCRIBER_PROVIDER/MODEL/LANGUAGE`
-- [x] Performance tuning: `VOICE_MAX_TOKENS=60`, `VOICE_TEMPERATURE=0.6`, `VAPI_CUSTOM_LLM_TIMEOUT_SECONDS=120`, `VAPI_SILENCE_TIMEOUT_SECONDS=180`
-- [x] `PUBLIC_BACKEND_URL` — required for Vapi's cloud to reach local backend (ngrok tunnel)
-- [x] `voice_status()` / `voice_enabled()` — checks which env vars are missing and surfaces reason to frontend
+#### Config (config.py) — COMPLETE
+- [x] Ollama, MongoDB, Auth (JWT/Google/cookie/rate-limit), Email/OTP, WhatsApp upload, Vapi settings — all centralized with sane defaults
 
-#### API Endpoints — COMPLETE
-- [x] POST /api/analyze/start
-- [x] POST /api/analyze/message
-- [x] POST /api/analyze/finalize
-- [x] POST /api/chat/start
-- [x] POST /api/chat/message
-- [x] GET /api/profiles
-- [x] GET /api/profiles/{id}
-- [x] DELETE /api/profiles/{id}
-- [x] GET /api/profiles/{id}/conversations
-- [x] GET /api/voice/config
-- [x] POST /api/voice/start
-- [x] POST /api/voice/end
-- [x] GET /api/voice/session/{session_id}
-- [x] POST /api/voice/webhook (Vapi lifecycle events)
-- [x] POST /api/voice/llm/{session_id}/chat/completions (OpenAI-compatible SSE — Vapi custom-LLM endpoint)
-- [x] CORS middleware (all origins allowed)
+#### API Endpoints — see [backend.md](backend.md) for the full, current list (auth, analyze, WhatsApp import, chat, profiles, reflect, voice)
 
 ---
 
 ### Frontend
 
-#### Common Components — ALL COMPLETE
-- [x] Button.jsx (4 variants, 3 sizes, loading state, icon, animations)
-- [x] Card.jsx (hover lift, glow option, click support)
-- [x] Input.jsx (label, icon, error state, all native props pass-through)
-- [x] Loader.jsx (inline + full-page modes)
-- [x] Modal.jsx (backdrop, Escape key, scroll lock, animations)
-- [x] Navbar.jsx (fixed floating, desktop links, mobile hamburger menu)
+#### Auth — COMPLETE
+- [x] `Login.jsx`, `Signup.jsx` (with OTP entry step), Google Sign-In button
+- [x] `AuthContext` — current user, `authLoading`, login/signup/logout/Google methods
+- [x] `ProtectedRoute` — redirects to `/login` when not authenticated; every twin/reflect/chat/voice route is wrapped in it
 
-#### Analysis Feature Components — ALL COMPLETE
-- [x] ProgressCard.jsx (animated progress bar, question counter)
-- [x] QuestionCard.jsx (textarea, Ctrl+Enter submit, char counter)
-- [x] AnalysisSidebar.jsx (step checklist, privacy tip card)
+#### Common Components — COMPLETE
+- [x] Button, Card (repeated-card blur removed — see [progress note above](#overall-completion)), Input, Loader, Modal, Navbar, ProtectedRoute
 
-#### Profile Feature Components — ALL COMPLETE
-- [x] ProfileCard.jsx (avatar, stats, active state, delete modal)
-- [x] ProfileGrid.jsx (3-column grid, "Create New Twin" tile)
-- [x] PersonalityCard.jsx (personality dimensions, topics, values, summary)
-- [x] StatCard.jsx (icon, label, value, subtext, 3 color modes)
+#### Analysis Feature Components — COMPLETE
+- [x] ProgressCard, QuestionCard, AnalysisSidebar
 
-#### Chat Feature Components — ALL COMPLETE (previously stubs)
-- [x] ChatBubble.jsx — message bubble, user right / assistant left
-- [x] ChatInput.jsx — textarea + send button, Enter to send
-- [x] MessageList.jsx — scrollable container, auto-scroll to bottom
-- [x] TypingIndicator.jsx — animated 3-dot loading indicator
+#### Profile Feature Components — COMPLETE
+- [x] ProfileCard, ProfileGrid, PersonalityCard, StatCard, `PersonalityChart` (Big Five bar chart + radar chart, normalizes 0–1 vs 0–100 vs string vs `{score, description}` input shapes, shows "N/A" for missing traits)
 
-#### Voice Feature Components — ALL COMPLETE (NEW)
-- [x] CallTimer.jsx — formats and displays call duration (MM:SS)
-- [x] ConnectionStatus.jsx — status badge (idle / connecting / connected / ended / error)
-- [x] SpeakingIndicator.jsx — avatar circle with pulsing ring when assistant is speaking
-- [x] VoiceTranscript.jsx — live scrolling transcript of voice conversation
-- [x] WaveformVisualizer.jsx — animated audio waveform bars responding to volume level
+#### Chat Feature Components — COMPLETE
+- [x] ChatBubble (streaming-aware), ChatInput, MessageList, TypingIndicator
 
-#### Voice Hook — COMPLETE (NEW)
-- [x] `useVapiCall.js` — wraps Vapi Web SDK into React state machine
-  - States: idle → connecting → connected → ended / error
-  - Manages: call start/end, transcript updates, volume levels, speaking detection, call timer
-  - Syncs session start/end with backend (api.startVoiceSession, api.endVoiceSession)
-  - Handles all Vapi event types: call-start, call-end, speech-start, speech-end, volume-level, message (transcript), error
+#### Voice Feature Components — COMPLETE
+- [x] CallTimer, ConnectionStatus, SpeakingIndicator, VoiceTranscript, WaveformVisualizer, `useVapiCall` hook
 
-#### Context — COMPLETE
-- [x] ProfileContext.jsx (profiles list, selected profile, localStorage sync)
-- [x] useProfile() hook with fetchProfiles, selectProfile, removeProfile
-
-#### Services — COMPLETE (extended)
-- [x] api.js — all 12 API methods:
-  - Profiles: getProfiles, getProfile, deleteProfile, getProfileConversations
-  - Analysis: startAnalysis, sendAnalysisMessage, finalizeAnalysis
-  - Chat: startChat, sendChatMessage
-  - Voice: getVoiceConfig, startVoiceSession, endVoiceSession
+#### Reflect Feature Components — COMPLETE
+- [x] `ReflectEntryCard` (history list item with mood badge), `ReflectDetailModal` (original entry + AI reflection, edit, delete)
 
 #### Pages — ALL BUILT
 
-Landing.jsx — DONE (~95%)
-- [x] Hero, Features, How It Works, Technology, Pricing, Footer
-- [x] Simulated demo chat widget
-- [ ] Demo chat uses hardcoded responses (not connected to real API)
+Landing.jsx — DONE — hero, features, how it works, technology, pricing, footer, simulated demo chat widget (hardcoded responses, not connected to the real API — cosmetic only)
 
-Analyze.jsx — DONE (~90%)
-- [x] Full 10-question interview flow, finalization, navigation
+Login.jsx / Signup.jsx — DONE — email/password + Google Sign-In; Signup includes the OTP-entry step
 
-Profiles.jsx — DONE (~85%)
-- [x] Profile grid, active twin banner, delete with confirm modal
+Analyze.jsx — DONE — full 10-question interview flow, **plus** a WhatsApp chat import flow (upload → pick sender → finalize) as an alternative path to creating a profile
 
-Dashboard.jsx — DONE (~80%)
-- [x] Profile stats display (StatCard components)
-- [x] Personality data (PersonalityCard component)
-- [x] Conversation history list
-- [x] Quick action buttons (Start Chat, Voice)
-- [ ] No personality visualization charts (bar/radar) yet
-- [ ] No profile rename functionality
+Profiles.jsx — DONE — profile grid, active twin banner, delete with confirm modal
 
-Chat.jsx — DONE (~85%)
-- [x] Full chat UI: MessageList, ChatBubble, ChatInput, TypingIndicator
-- [x] Start chat session on mount from selectedProfile
-- [x] Real-time message send/receive via api.startChat + api.sendChatMessage
-- [x] Error handling (no profile, API down)
-- [x] Chat history loads from backend (persistent across sessions)
-- [ ] No streaming (replies appear all at once after full generation)
+Dashboard.jsx — DONE — profile stats, Big Five personality visualization (bar chart + radar chart), conversation history, quick actions
 
-Voice.jsx — DONE (~85%)
-- [x] Vapi SDK integration via useVapiCall hook
-- [x] Voice configuration check (shows setup instructions if unconfigured)
-- [x] Connect/disconnect call flow
-- [x] SpeakingIndicator, WaveformVisualizer, VoiceTranscript, CallTimer, ConnectionStatus
-- [x] Live transcript of voice conversation
-- [ ] Latency is high when VAPI_LLM_PROVIDER=custom-llm (Ollama on CPU; see latency analysis)
+Chat.jsx — DONE — full chat UI, **streams replies progressively** (SSE), falls back to non-streaming JSON automatically if the client doesn't request `text/event-stream`
 
-ModeSelect.jsx (formerly Reflect.jsx route) — DONE (~80%)
-- [x] Mode selection hub between Chat and Voice
+Voice.jsx — DONE — Vapi SDK integration, connect/disconnect, live transcript, waveform
 
-Reflect.jsx — STUB (~10%)
-- [ ] Reflection/journaling feature — not yet designed
+Reflect.jsx — DONE — compose box, save-and-reflect flow, history list, detail modal, edit, delete, re-analyze on failure
+
+ModeSelect.jsx — DONE — mode hub between Chat and Voice, mounted at `/mode`
 
 ---
 
-## What Is NOT DONE / Known Issues
+## What Is NOT DONE / Known Limitations
 
-### Voice Latency (Major UX Issue)
-- **Root cause:** `VAPI_LLM_PROVIDER=custom-llm` routes every voice reply through local Ollama
-- **Typical latency per turn:** 3–7 seconds (Deepgram STT ~200ms + ngrok tunnel ~100ms + Ollama TTFT ~2–6s + Vapi TTS ~300ms)
-- **Fix options:**
-  - A: Switch to `VAPI_LLM_PROVIDER=vapi-native` (uses gpt-4o-mini — ~500ms total, but not same Ollama engine)
-  - B: Use a faster local model (phi3:mini, gemma2:2b) with lower TTFT
-  - C: Cache history in memory, reduce per-turn disk I/O
-  - D: Hybrid: vapi-native for voice, Ollama for text chat
+These are current, verified limitations — not stale claims:
 
-### Backend
-- [ ] In-memory sessions only — lost on server restart (no database)
-- [ ] No authentication — anyone on port 8000 can access all profiles
-- [ ] Conversation summarization stub (`TwinChat.summarize_conversation()` returns placeholder)
-- [ ] Text chat is non-streaming (full reply before response returned)
-- [ ] Legacy files at project root (`personality.json`, prototype scripts) — not used, can be deleted
-- [ ] No rollback on partial finalization failure
-
-### Frontend
-- [ ] Chat.jsx: no streaming (non-streaming reply from backend)
-- [ ] Voice.jsx: high latency with custom-llm provider
-- [ ] Dashboard.jsx: no personality radar/bar charts
-- [ ] Reflect.jsx: feature not designed
-- [ ] No profile rename/edit functionality
-- [ ] Navbar anchor links only work on Landing page (/#features etc.)
-
----
-
-## Priority Work Order (Recommended)
-
-### Priority 1 — Voice Latency (Current Pain Point)
-1. **Decide on LLM provider** — `vapi-native` vs. smaller local model
-2. **Switch `VAPI_LLM_PROVIDER`** in `.env` if going native
-
-### Priority 2 — Streaming Text Chat
-3. **Wire up streaming** — `OllamaClient.chat(stream=True)` + SSE endpoint + frontend EventSource
-
-### Priority 3 — Dashboard Polish
-4. **Personality visualization charts** — Big 5 traits as bar/radar charts
-
-### Priority 4 — Backend Stability
-5. **Add SQLite or Redis** — persist sessions across server restarts
-6. **Fix summarization** — implement `summarize_conversation()`
-
-### Priority 5 — Reflect Feature
-7. **Design and build Reflect.jsx** — journaling prompts, mood tracking, insights
+- **In-memory session/rate-limiter state.** Active interview/chat/voice sessions and the login/OTP rate limiters live in per-process memory, not MongoDB. They reset on a backend restart, and if this backend is ever run as more than one process/instance, each instance would track its own separate counters/sessions — a shared store (e.g. Redis) would be needed for horizontal scaling. Profile, conversation, and reflection *data* is unaffected — that's all in MongoDB.
+- **Existing profiles may need re-analysis for Big Five scores.** Profiles created before the personality-visualization work was done don't have `personality.<trait>.score` populated — the Dashboard shows "Personality insights aren't available yet" for those until the profile is re-analyzed (a new interview or WhatsApp import). This is not automatic/retroactive.
+- **`vapi-native` voice mode doesn't share this backend's live turn-by-turn context the way `custom-llm` does.** In `vapi-native` mode, Vapi's own hosted model generates replies using a system prompt built once at call start; this backend only learns what was actually said via the end-of-call webhook, not per-turn. `custom-llm` mode (the fallback) does read the persisted conversation summary on every turn.
+- **A voice-only conversation doesn't advance the conversation summary on its own** — only `TextChatService` runs the summarization/folding step. Voice (`custom-llm` mode) reads whatever summary already exists but won't generate a new one unless the same conversation is also used from Text Chat.
+- **Voice latency in `custom-llm` mode** — a CPU-only local Ollama model's time-to-first-token can be several seconds to over a minute; `vapi-native` (the default) doesn't have this problem since it uses a hosted model.
+- **Landing page's demo chat widget is cosmetic** — hardcoded responses, not wired to the real backend.
+- **No profile rename functionality.**
+- **Navbar anchor links** (`#features`, etc.) only scroll correctly on the Landing page — they appear on every page since Navbar is shared.
 
 ---
 
 ## File Status Quick Reference
 
-### Backend Files
-| File | Status | Notes |
-|------|--------|-------|
-| backend/run.py | DONE | Uvicorn entry point |
-| backend/app/main.py | DONE | Router-based, v2.0.0 |
-| backend/app/schemas.py | DONE | Includes all voice schemas |
-| backend/app/config.py | DONE (NEW) | Centralized env config, Ollama + Vapi |
-| backend/app/dependencies.py | DONE (NEW) | Shared service singletons |
-| backend/app/routers/analyze.py | DONE (NEW) | Analysis endpoints |
-| backend/app/routers/chat.py | DONE (NEW) | Chat endpoints |
-| backend/app/routers/profiles.py | DONE (NEW) | Profile endpoints |
-| backend/app/routers/voice.py | DONE (NEW) | Voice + custom-LLM + webhook endpoints |
-| backend/app/services/analyzer.py | DONE | Complete |
-| backend/app/services/chat.py | DONE | Thin shim over DigitalTwinEngine |
-| backend/app/services/twin_engine.py | DONE (NEW) | Shared brain for text + voice |
-| backend/app/services/voice_chat_service.py | DONE (NEW) | Full Vapi voice integration |
-| backend/app/services/vapi_client.py | DONE (NEW) | Webhook secret verification |
-| backend/app/services/communication_analyzer.py | DONE | Complete, 15+ metrics |
-| backend/app/services/ollama_client.py | DONE | max_tokens param; mistral model default |
-| backend/app/services/twin_context.py | DONE | Supporting context utilities |
-| backend/personality.json | LEGACY | Not used by API, can be deleted |
-
-### Frontend Files
-| File | Status | Notes |
-|------|--------|-------|
-| frontend/src/main.jsx | DONE | No changes needed |
-| frontend/src/App.jsx | DONE | All 7 routes defined |
-| frontend/src/services/api.js | DONE | 12 API methods (added 3 voice methods) |
-| frontend/src/context/ProfileContext.jsx | DONE | Full implementation |
-| frontend/src/hooks/useVapiCall.js | DONE (NEW) | Vapi SDK state machine hook |
-| frontend/src/pages/Landing.jsx | DONE | Fully polished |
-| frontend/src/pages/Analyze.jsx | DONE | Core flow works |
-| frontend/src/pages/Profiles.jsx | DONE | Working |
-| frontend/src/pages/Dashboard.jsx | DONE | Profile stats + personality + history |
-| frontend/src/pages/Chat.jsx | DONE | Full chat UI |
-| frontend/src/pages/Voice.jsx | DONE | Full Vapi voice UI |
-| frontend/src/pages/ModeSelect.jsx | DONE | Chat/Voice mode hub |
-| frontend/src/pages/Reflect.jsx | STUB | Feature not yet designed |
-| frontend/src/components/common/Button.jsx | DONE | |
-| frontend/src/components/common/Card.jsx | DONE | |
-| frontend/src/components/common/Input.jsx | DONE | |
-| frontend/src/components/common/Loader.jsx | DONE | |
-| frontend/src/components/common/Modal.jsx | DONE | |
-| frontend/src/components/common/Navbar.jsx | DONE | |
-| frontend/src/components/features/analysis/AnalysisSidebar.jsx | DONE | |
-| frontend/src/components/features/analysis/ProgressCard.jsx | DONE | |
-| frontend/src/components/features/analysis/QuestionCard.jsx | DONE | |
-| frontend/src/components/features/chat/ChatBubble.jsx | DONE | Previously stub |
-| frontend/src/components/features/chat/ChatInput.jsx | DONE | Previously stub |
-| frontend/src/components/features/chat/MessageList.jsx | DONE | Previously stub |
-| frontend/src/components/features/chat/TypingIndicator.jsx | DONE | Previously stub |
-| frontend/src/components/features/voice/CallTimer.jsx | DONE (NEW) | |
-| frontend/src/components/features/voice/ConnectionStatus.jsx | DONE (NEW) | |
-| frontend/src/components/features/voice/SpeakingIndicator.jsx | DONE (NEW) | |
-| frontend/src/components/features/voice/VoiceTranscript.jsx | DONE (NEW) | |
-| frontend/src/components/features/voice/WaveformVisualizer.jsx | DONE (NEW) | |
-| frontend/src/components/features/profile/PersonalityCard.jsx | DONE | |
-| frontend/src/components/features/profile/ProfileCard.jsx | DONE | |
-| frontend/src/components/features/profile/ProfileGrid.jsx | DONE | |
-| frontend/src/components/features/profile/StatCard.jsx | DONE | |
+See [backend.md](backend.md) and [frontend.md](frontend.md) for the full current file-by-file reference — kept there instead of duplicated here so there's one place to update per change.

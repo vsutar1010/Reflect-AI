@@ -1,22 +1,24 @@
 # ReflectAI — Frontend Documentation
 
-> **Purpose:** Complete reference for the React/Vite frontend. Feed this file to any AI to get full context of the frontend codebase — every file, folder, component, state, prop, hook, and API call is documented here.
-> **Last Updated:** 2026-07-29
+> **Purpose:** Complete reference for the React/Vite frontend. Feed this file to any AI to get full context of the frontend codebase.
+> **Last Updated:** 2026-09-04
 
 ---
 
 ## Tech Stack
 
-| Tool | Version | Purpose |
-|------|---------|---------|
-| React | ^19.2.7 | UI framework |
-| Vite | ^8.1.1 | Build tool / dev server |
-| React Router DOM | ^7.11.0 | Client-side routing |
-| Framer Motion | ^12.42.2 | Animations & transitions |
-| Lucide React | ^1.25.0 | Icon library |
-| TailwindCSS | ^3.4.19 | Utility-first CSS |
-| PostCSS + Autoprefixer | ^8.5.19 / ^10.5.4 | CSS processing |
-| @vapi-ai/web | latest | Vapi Web SDK for voice calls |
+| Tool | Purpose |
+|------|---------|
+| React | UI framework |
+| Vite | Build tool / dev server |
+| React Router DOM | Client-side routing (lazy-loaded pages) |
+| Framer Motion | Animations & transitions |
+| Lucide React | Icon library |
+| TailwindCSS | Utility-first CSS |
+| PostCSS + Autoprefixer | CSS processing |
+| @vapi-ai/web | Vapi Web SDK for voice calls |
+
+See `frontend/package.json` for exact pinned versions.
 
 ---
 
@@ -24,68 +26,55 @@
 
 ```
 frontend/
-├── index.html                      # Vite HTML entry point. Mounts <div id="root">
-├── vite.config.js                  # Vite config — uses @vitejs/plugin-react
-├── tailwind.config.js              # Tailwind config (minimal, content paths set)
-├── postcss.config.js               # PostCSS config for Tailwind + Autoprefixer
-├── eslint.config.js                # ESLint flat config (react-hooks, react-refresh plugins)
-├── package.json                    # Dependencies (see Tech Stack above)
-├── .gitignore                      # Ignores node_modules, dist, .env
-├── public/                         # Static assets served at root URL
+├── index.html
+├── vite.config.js
+├── tailwind.config.js
+├── postcss.config.js
+├── eslint.config.js
+├── package.json
+├── public/
 └── src/
     ├── main.jsx                    # React DOM root mount
     ├── App.jsx                     # Route definitions + Provider wrapper
-    ├── App.css                     # Global gradient/glow animation keyframes
-    ├── index.css                   # Tailwind directives (@base, @components, @utilities)
-    ├── assets/                     # Static images imported in Landing.jsx
-    │   ├── hero.png
-    │   ├── voice1.jpg, voice2.jpg
-    │   ├── img1.jpg, img2.jpg, img3.jpg
-    │   ├── chat1.jpg, chat2.jpg
+    ├── App.css / index.css         # Global styles, Tailwind directives
+    ├── assets/                     # Static images (Landing.jsx)
     ├── context/
-    │   └── ProfileContext.jsx      # Global profile state (React Context + localStorage)
+    │   ├── AuthContext.jsx         # Signed-in user, login/signup/logout/Google methods
+    │   └── ProfileContext.jsx      # Selected twin (persisted in localStorage)
     ├── hooks/
-    │   └── useVapiCall.js          # NEW: Vapi SDK state machine hook for voice calls
+    │   └── useVapiCall.js          # Vapi SDK state machine hook for voice calls
     ├── services/
-    │   └── api.js                  # Centralized API client (12 methods)
+    │   └── api.js                  # Centralized API client (all backend calls)
     ├── pages/
-    │   ├── Landing.jsx             # DONE: Marketing homepage (~519 lines)
-    │   ├── Analyze.jsx             # DONE: 10-question personality interview flow
-    │   ├── Profiles.jsx            # DONE: Profile management grid page
-    │   ├── Dashboard.jsx           # DONE: Profile detail, personality, stats (~580 lines)
-    │   ├── Chat.jsx                # DONE: Full text chat UI (~260 lines)
-    │   ├── Voice.jsx               # DONE: Full Vapi voice UI (~181 lines)
-    │   ├── ModeSelect.jsx          # DONE: Chat/Voice mode hub (~178 lines)
-    │   └── Reflect.jsx             # STUB: feature not yet designed
+    │   ├── Landing.jsx             # Marketing homepage
+    │   ├── Login.jsx               # Email/password + Google Sign-In
+    │   ├── Signup.jsx              # Email/password signup + OTP verification step
+    │   ├── Analyze.jsx             # 10-question interview flow + WhatsApp import flow
+    │   ├── Profiles.jsx            # Profile management grid page
+    │   ├── Dashboard.jsx           # Profile detail, stats, Big Five visualization
+    │   ├── Chat.jsx                # Full text chat UI, streaming
+    │   ├── Voice.jsx               # Full Vapi voice UI
+    │   ├── ModeSelect.jsx          # Chat/Voice mode hub (mounted at /mode)
+    │   └── Reflect.jsx             # Journaling: compose, history, detail, edit, delete
     └── components/
         ├── common/                 # Reusable UI primitives
-        │   ├── Button.jsx          # DONE: Multi-variant animated button
-        │   ├── Card.jsx            # DONE: Glassmorphism card container
-        │   ├── Input.jsx           # DONE: Styled input with icon + error support
-        │   ├── Loader.jsx          # DONE: Animated spinner (inline or full-page)
-        │   ├── Modal.jsx           # DONE: Animated overlay modal dialog
-        │   └── Navbar.jsx          # DONE: Fixed floating navbar with mobile menu
+        │   ├── Button.jsx
+        │   ├── Card.jsx            # Shared glass-card — see Design System note below
+        │   ├── Input.jsx
+        │   ├── Loader.jsx
+        │   ├── Modal.jsx
+        │   ├── Navbar.jsx
+        │   ├── ProtectedRoute.jsx  # Redirects to /login when not authenticated
+        │   ├── GoogleSignInButton.jsx  # Renders only if VITE_GOOGLE_CLIENT_ID is set
+        │   └── AnimatedBackground.jsx
         └── features/
-            ├── analysis/           # Components used in /analyze
-            │   ├── AnalysisSidebar.jsx   # DONE: Step checklist sidebar
-            │   ├── ProgressCard.jsx      # DONE: Animated progress bar
-            │   └── QuestionCard.jsx      # DONE: Question display + answer textarea
-            ├── chat/               # All DONE (previously empty stubs)
-            │   ├── ChatBubble.jsx        # DONE: Message bubble (user right / assistant left)
-            │   ├── ChatInput.jsx         # DONE: Textarea + send button
-            │   ├── MessageList.jsx       # DONE: Scrollable container, auto-scroll
-            │   └── TypingIndicator.jsx   # DONE: Animated 3-dot loading indicator
-            ├── voice/              # NEW: All DONE
-            │   ├── CallTimer.jsx         # DONE: MM:SS call duration display
-            │   ├── ConnectionStatus.jsx  # DONE: Status badge (idle/connecting/connected/ended/error)
-            │   ├── SpeakingIndicator.jsx # DONE: Avatar with pulsing ring when speaking
-            │   ├── VoiceTranscript.jsx   # DONE: Live scrolling transcript
-            │   └── WaveformVisualizer.jsx# DONE: Animated audio waveform bars
-            └── profile/
-                ├── PersonalityCard.jsx   # DONE: Personality dimensions display
-                ├── ProfileCard.jsx       # DONE: Single profile card with delete modal
-                ├── ProfileGrid.jsx       # DONE: Grid of ProfileCards + "Create New" tile
-                └── StatCard.jsx          # DONE: Stat display (icon + label + value)
+            ├── analysis/           # AnalysisSidebar, ProgressCard, QuestionCard
+            ├── chat/                # ChatBubble, ChatInput, MessageList, TypingIndicator
+            ├── voice/               # CallTimer, ConnectionStatus, SpeakingIndicator,
+            │                        # VoiceTranscript, WaveformVisualizer
+            ├── profile/             # PersonalityCard, PersonalityChart, ProfileCard,
+            │                        # ProfileGrid, StatCard
+            └── reflect/              # ReflectEntryCard, ReflectDetailModal, moodStyles.js
 ```
 
 ---
@@ -93,27 +82,34 @@ frontend/
 ## Entry Points
 
 ### src/main.jsx
-Mounts React app into `<div id="root">` in index.html. Wraps in StrictMode.
+Mounts React app into `<div id="root">`, wrapped in `StrictMode`.
 
 ### src/App.jsx
-All routes defined here. ProfileProvider wraps everything.
+Every page is lazy-loaded (`React.lazy`) so heavy per-page dependencies (e.g. `@vapi-ai/web`, only needed by Voice) aren't in the first-paint bundle.
 
 ```jsx
 export default function App() {
   return (
-    <ProfileProvider>
-      <Router>
-        <Routes>
-          <Route path="/"          element={<Landing />} />
-          <Route path="/analyze"   element={<Analyze />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/profiles"  element={<Profiles />} />
-          <Route path="/reflect"   element={<ModeSelect />} />  {/* mode hub */}
-          <Route path="/chat"      element={<Chat />} />
-          <Route path="/voice"     element={<Voice />} />
-        </Routes>
-      </Router>
-    </ProfileProvider>
+    <AuthProvider>
+      <ProfileProvider>
+        <Router>
+          <Suspense fallback={<Loader fullPage text="Loading..." />}>
+            <Routes>
+              <Route path="/"          element={<Landing />} />
+              <Route path="/login"     element={<Login />} />
+              <Route path="/signup"    element={<Signup />} />
+              <Route path="/analyze"   element={<ProtectedRoute><Analyze /></ProtectedRoute>} />
+              <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+              <Route path="/reflect"   element={<ProtectedRoute><Reflect /></ProtectedRoute>} />
+              <Route path="/mode"      element={<ProtectedRoute><ModeSelect /></ProtectedRoute>} />
+              <Route path="/chat"      element={<ProtectedRoute><Chat /></ProtectedRoute>} />
+              <Route path="/voice"     element={<ProtectedRoute><Voice /></ProtectedRoute>} />
+              <Route path="/profiles"  element={<ProtectedRoute><Profiles /></ProtectedRoute>} />
+            </Routes>
+          </Suspense>
+        </Router>
+      </ProfileProvider>
+    </AuthProvider>
   );
 }
 ```
@@ -122,80 +118,37 @@ export default function App() {
 
 ## Route Map
 
-| Route | Component | Status | Description |
-|-------|-----------|--------|-------------|
-| `/` | Landing.jsx | DONE | Marketing homepage |
-| `/analyze` | Analyze.jsx | DONE | Personality interview |
-| `/profiles` | Profiles.jsx | DONE | Profile list/select/delete |
-| `/dashboard` | Dashboard.jsx | DONE | Profile detail, stats, personality |
-| `/reflect` | ModeSelect.jsx | DONE | Chat vs. Voice mode hub |
-| `/chat` | Chat.jsx | DONE | Full text chat UI |
-| `/voice` | Voice.jsx | DONE | Full Vapi voice call UI |
+| Route | Component | Auth | Description |
+|-------|-----------|------|-------------|
+| `/` | Landing.jsx | Public | Marketing homepage |
+| `/login` | Login.jsx | Public | Email/password + Google Sign-In |
+| `/signup` | Signup.jsx | Public | Email/password signup + OTP step |
+| `/analyze` | Analyze.jsx | Protected | Interview or WhatsApp import → creates a profile |
+| `/profiles` | Profiles.jsx | Protected | Profile list/select/delete |
+| `/dashboard` | Dashboard.jsx | Protected | Profile detail, stats, Big Five chart |
+| `/reflect` | Reflect.jsx | Protected | Journaling — compose, history, detail, edit, delete |
+| `/mode` | ModeSelect.jsx | Protected | Chat vs. Voice mode hub |
+| `/chat` | Chat.jsx | Protected | Full text chat UI, streaming |
+| `/voice` | Voice.jsx | Protected | Full Vapi voice call UI |
+
+**`ProtectedRoute`** renders a full-page loader while the initial `api.me()` check is in flight, then redirects to `/login` if there's no authenticated user.
 
 ---
 
 ## Context
 
+### src/context/AuthContext.jsx
+`useAuth()` provides: `user`, `authLoading`, `requestSignupOtp(email, password, name)`, `verifySignupOtp(email, otp)`, `login(email, password)`, `loginWithGoogle(credential)`, `logout()`. On mount, calls `api.me()` once to restore the session from the cookie; failure just means `user = null` (not an error state).
+
 ### src/context/ProfileContext.jsx
-
-**Purpose:** Global state for personality profiles. Any page can access active profile and list without prop drilling.
-
-**Provides via `useProfile()` hook:**
-
-| Value | Type | Description |
-|-------|------|-------------|
-| `profiles` | Array | All profile summaries from backend |
-| `selectedProfile` | Object or null | Active profile (also persisted in localStorage) |
-| `selectProfile(profile)` | Function | Sets active profile + writes to localStorage |
-| `removeProfile(id)` | async Function | DELETE /api/profiles/:id, clears selection if deleted |
-| `fetchProfiles()` | async Function | Refreshes list from backend |
-| `loadingProfiles` | Boolean | True while fetching |
-| `error` | String or null | Error message if fetch fails |
-
-**localStorage key:** `reflect_active_profile`
+`useProfile()` provides: `profiles`, `selectedProfile`, `selectProfile(profile)`, `removeProfile(id)`, `fetchProfiles()`, `loadingProfiles`, `error`. **localStorage key:** `reflect_active_profile`.
 
 ---
 
 ## Hooks
 
-### src/hooks/useVapiCall.js — NEW
-
-**Purpose:** Wraps the Vapi Web SDK into a React state machine. Used by Voice.jsx.
-
-**Parameters:** `profileId` (string)
-
-**Returns:**
-| Value | Type | Description |
-|-------|------|-------------|
-| `status` | string | `idle` → `connecting` → `connected` → `ended` / `error` |
-| `error` | string or null | Normalized error message |
-| `isAssistantSpeaking` | boolean | True during Vapi speech-start events |
-| `isListening` | boolean | True when connected and assistant not speaking |
-| `volumeLevel` | number | 0–1 volume level from Vapi (for waveform) |
-| `micLevel` | number | 0–1 local microphone level |
-| `transcript` | Array | `[{ role, text, final }]` — live conversation transcript |
-| `callDuration` | number | Seconds since call connected |
-| `connect()` | async Function | Starts session: calls backend, then `vapi.start(assistant_config)` |
-| `disconnect()` | Function | Calls `vapi.stop()`, ends backend session |
-
-**connect() flow:**
-1. `api.startVoiceSession(profileId)` → gets `{ session_id, public_key, assistant }`
-2. Seeds transcript with `assistant.firstMessage` immediately
-3. `new Vapi(public_key)` + registers all event listeners
-4. `vapi.start(assistant)` — Vapi opens WebRTC call
-
-**Event listeners registered:**
-- `call-start` → setStatus('connected'), start timer
-- `call-end` → setStatus('ended'), endBackendSession
-- `speech-start` → setIsAssistantSpeaking(true)
-- `speech-end` → setIsAssistantSpeaking(false)
-- `volume-level` → setVolumeLevel
-- `local-volume-level` → setMicLevel
-- `message` (type=transcript) → updates transcript array (partial/final)
-- `call-start-failed` → setStatus('error')
-- `error` → setStatus('error')
-
-**Error normalization:** `toErrorMessage()` handles all Vapi error shapes (string, Error, nested objects) → always returns a plain string safe for JSX rendering.
+### src/hooks/useVapiCall.js
+Wraps the Vapi Web SDK into a React state machine. Returns `status` (`idle`→`connecting`→`connected`→`ended`/`error`), `error`, `isAssistantSpeaking`, `isListening`, `volumeLevel`, `micLevel`, `transcript`, `callDuration`, `connect()`, `disconnect()`. `connect()` calls `api.startVoiceSession(profileId)`, seeds the transcript with `assistant.firstMessage`, then opens the Vapi call. Registers all Vapi event listeners (`call-start`, `call-end`, `speech-start/end`, `volume-level`, `local-volume-level`, `message`, `call-start-failed`, `error`). `toErrorMessage()` normalizes every Vapi error shape into a plain string safe for JSX.
 
 ---
 
@@ -203,320 +156,119 @@ export default function App() {
 
 ### src/services/api.js
 
-**Base URL:** `http://localhost:8000/api`
+**Base URL:** `http://localhost:8000/api`. Every request sends `credentials: 'include'` (the session cookie). `handleResponse()` throws `Error(detail)` from the backend's error body, and appends a "try again in about N minutes" hint when the response is `429` with a `Retry-After` header.
 
-**All exported API methods:**
 ```js
 export const api = {
-  // Profiles
-  getProfiles()                         // GET    /profiles
-  getProfile(id)                        // GET    /profiles/:id
-  deleteProfile(id)                     // DELETE /profiles/:id
-  getProfileConversations(id)           // GET    /profiles/:id/conversations
+  // Auth
+  requestSignupOtp({ email, password, name }),
+  verifySignupOtp({ email, otp }),
+  login({ email, password }),
+  loginWithGoogle(credential),
+  logout(),
+  me(),
 
-  // Analysis Flow (must be called in order)
-  startAnalysis()                       // POST   /analyze/start
-  sendAnalysisMessage(sessionId, msg)   // POST   /analyze/message
-  finalizeAnalysis(sessionId, name)     // POST   /analyze/finalize
+  // Profiles
+  getProfiles(), getProfile(id), deleteProfile(id),
+  getProfileConversations(id), setProfileVoice(id, gender),
+
+  // Analysis Flow
+  startAnalysis(), sendAnalysisMessage(sessionId, message),
+  finalizeAnalysis(sessionId, profileName),
+
+  // WhatsApp Chat Import
+  uploadWhatsAppChat(file),               // multipart/form-data
+  finalizeWhatsAppChat(uploadId, targetSender, profileName),
 
   // Chat Flow
-  startChat(profileId)                  // POST   /chat/start
-  sendChatMessage(sessionId, msg)       // POST   /chat/message
+  startChat(profileId),
+  sendChatMessage(sessionId, message),        // non-streaming JSON
+  streamChatMessage(sessionId, message, { onDelta, onDone, onError, signal }),  // SSE
 
-  // Voice Chat Flow (Vapi) — NEW
-  getVoiceConfig()                      // GET    /voice/config
-  startVoiceSession(profileId)          // POST   /voice/start
-  endVoiceSession(sessionId)            // POST   /voice/end
-}
+  // Reflect / Journaling
+  createReflectEntry(profileId, content),
+  getReflectEntries(profileId, { limit, skip }),
+  getReflectEntry(id), updateReflectEntry(id, content),
+  reanalyzeReflectEntry(id), deleteReflectEntry(id),
+
+  // Voice Chat Flow (Vapi)
+  getVoiceConfig(), startVoiceSession(profileId), endVoiceSession(sessionId),
+};
 ```
 
-FastAPI error detail field is extracted and re-thrown as `Error(detail)`.
+`streamSSE()` (internal helper) reads a `text/event-stream` response as `data: {...}\n\n` frames, dispatching `onDelta({delta})`, `onDone()`, or `onError(message)` — this is what `streamChatMessage` and `Chat.jsx` build on for progressive token rendering.
 
 ---
 
 ## Pages (Detailed)
 
-### src/pages/Landing.jsx — DONE (~95%)
+### src/pages/Landing.jsx
+Hero (CTA to `/signup`), Features, How It Works, Technology, Pricing, Footer. Includes a simulated demo chat widget with hardcoded keyword responses (`setTimeout`) — cosmetic only, not connected to the real API.
 
-**Sections:** Hero (CTA to /analyze, simulated demo chat), Features, How It Works, Technology, Pricing, Footer.
+### src/pages/Login.jsx / Signup.jsx
+Email/password forms plus `GoogleSignInButton.jsx` (renders only if `VITE_GOOGLE_CLIENT_ID` is set). `Signup.jsx` has two stages: request OTP → enter the 6-digit code → account created + session cookie set. Error display is generic (`err.message` from the thrown `Error`) — the backend intentionally returns identical error text for different failure causes on the login/signup-OTP endpoints (account-enumeration protection), so the frontend never special-cases specific error strings.
 
-**Demo chat:** Simulated, no real API. Hardcoded keyword responses. `setTimeout(1800ms)`.
+### src/pages/Analyze.jsx
+Two paths to a profile: the 10-question interview flow (`ProgressCard` + `QuestionCard` + `AnalysisSidebar`), or a WhatsApp chat export upload (client-side size check against `MAX_WHATSAPP_UPLOAD_MB`, then upload → pick the target sender from detected participants → finalize). Both end by navigating to `/dashboard` with the new profile selected.
 
-**Image imports from `../assets/`:** hero.png, voice1.jpg, voice2.jpg, img1.jpg, img2.jpg, img3.jpg, chat1.jpg, chat2.jpg
+### src/pages/Profiles.jsx
+3 render states: loading spinner → empty-state CTA → Active Twin Banner + `ProfileGrid`. Delete goes through a confirm modal.
 
----
+### src/pages/Dashboard.jsx
+Profile header, `StatCard` row (conversations, words analyzed, last used), `PersonalityCard` (personality dimensions, topics, values, summary) alongside `PersonalityChart` (Big Five bar chart + radar chart — see [PersonalityChart.jsx](#personalitychartjsx) below), conversation history list, quick actions (Start Chat, Voice Chat).
 
-### src/pages/Analyze.jsx — DONE (~90%)
+### src/pages/Chat.jsx
+**State:** `sessionId`, `messages`, `loading`, `sending`/streaming state, `error`. On mount, calls `api.startChat(selectedProfile.id)`. `handleSend(text)` adds the user message optimistically, then calls `api.streamChatMessage(...)`, appending each `onDelta` chunk to a placeholder assistant message so it grows progressively on screen; `onDone` finalizes it, `onError` surfaces the error. Uses an `AbortController` so navigating away mid-stream cancels the fetch cleanly. Falls back to the non-streaming path automatically if the browser doesn't support the streaming read loop.
 
-**Purpose:** 10-question personality analysis interview → finalize → navigate to /dashboard.
+### src/pages/Voice.jsx
+`api.getVoiceConfig()` on render decides whether to show setup instructions (with the backend's stated reason) or the call UI. Layout: header (profile name + `CallTimer` + `ConnectionStatus`), error banner, main card (`SpeakingIndicator`, "Speaking.../Listening..." label, `WaveformVisualizer`, Connect/Disconnect button, `VoiceTranscript`).
 
-**State:**
-| State | Purpose |
-|-------|---------|
-| `sessionId` | Active backend session UUID |
-| `question` | Current question text |
-| `progress` | 0-100 progress % |
-| `currentQuestionIndex` | Which question (0-indexed) |
-| `isCompleted` | True after all questions answered |
-| `loading` | True while starting session |
-| `submitting` | True while submitting answer |
-| `finalizing` | True while generating/saving profile |
-| `profileName` | Name user gives their digital twin |
-| `error` | Error message string or null |
+### src/pages/ModeSelect.jsx
+Two cards: "Text Chat" → `/chat`, "Voice Chat" → `/voice`. Mounted at `/mode`.
 
-**3 render states:** loading spinner → interview grid (ProgressCard + QuestionCard + AnalysisSidebar) → completion card (name input + finalize button)
-
----
-
-### src/pages/Profiles.jsx — DONE (~85%)
-
-**Purpose:** Lists all profiles, allows selecting active twin, creating new, or deleting.
-
-**3 render states:** loading spinner → empty state CTA → Active Twin Banner + ProfileGrid
-
-**Active Twin Banner:** Avatar, "Currently Active Twin" label, "View Dashboard" → /dashboard, "Start Chat" → /chat buttons.
-
----
-
-### src/pages/Dashboard.jsx — DONE (~80%)
-
-**Purpose:** Shows the selected profile's personality data, stats, and conversation history.
-
-**State:**
-| State | Purpose |
-|-------|---------|
-| `profileData` | Full profile data from GET /api/profiles/:id |
-| `conversations` | List from GET /api/profiles/:id/conversations |
-| `loading` | Loading indicator |
-| `error` | Error message |
-
-**Sections:**
-- Profile header: avatar, name, creation date
-- Stats row using StatCard: conversation count, created date, last used
-- PersonalityCard: personality dimensions, topics, values, summary
-- Conversation history list (from /api/profiles/:id/conversations)
-- Quick action buttons: Start Chat → /chat, Voice Chat → /voice
-
-**Missing:** Personality radar/bar charts (Big 5 visualization), profile rename functionality.
-
----
-
-### src/pages/Chat.jsx — DONE (~85%)
-
-**Purpose:** Full text chat UI with the digital twin.
-
-**State:**
-| State | Purpose |
-|-------|---------|
-| `sessionId` | Active backend chat session |
-| `messages` | Array of `{ role, content }` displayed in MessageList |
-| `loading` | True while starting session |
-| `sending` | True while waiting for reply |
-| `error` | Error message |
-
-**Flow:**
-```
-Mount → startChatSession():
-  api.startChat(selectedProfile.id) → { session_id, message }
-  → setSessionId, add opening message to messages
-
-User types → handleSend(text):
-  Add user message to messages immediately (optimistic)
-  setIsTyping(true)
-  api.sendChatMessage(sessionId, text) → { reply }
-  Add assistant reply to messages
-  setIsTyping(false)
-```
-
-**Components used:** MessageList → ChatBubble, TypingIndicator, ChatInput
-
-**Known gap:** Non-streaming — full reply appears at once after Ollama completes generation.
-
----
-
-### src/pages/Voice.jsx — DONE (~85%)
-
-**Purpose:** Full Vapi voice call interface.
-
-**Setup flow on render:**
-1. `api.getVoiceConfig()` — checks if Vapi is configured
-2. If not enabled: shows setup instructions with reason from backend
-3. If enabled: shows call UI with Connect button
-
-**State from `useVapiCall(selectedProfile?.id)` hook:**
-`status`, `error`, `isAssistantSpeaking`, `isListening`, `volumeLevel`, `transcript`, `callDuration`, `connect`, `disconnect`
-
-**Layout:**
-- Header: profile name + CallTimer + ConnectionStatus
-- Error banner (if error)
-- Main card:
-  - SpeakingIndicator (avatar with pulsing ring)
-  - "Speaking..." / "Listening..." label
-  - WaveformVisualizer (blue when speaking, purple when listening)
-  - Connect / Disconnect button
-  - VoiceTranscript (live scrolling conversation)
-- Footer note: "Voice replies run through the same personality engine as Text Chat."
-
-**Known gap:** High latency (3–7s per reply) when `VAPI_LLM_PROVIDER=custom-llm` due to local Ollama CPU TTFT.
-
----
-
-### src/pages/ModeSelect.jsx — DONE (~80%)
-
-**Purpose:** Mode selection hub between Chat and Voice. Mounted at `/reflect` route.
-
-Shows two large cards: "Text Chat" → /chat and "Voice Chat" → /voice. Displays selected profile name.
-
----
-
-### src/pages/Reflect.jsx — STUB (~10%)
-
-Current code is minimal placeholder. Reflection/journaling feature not yet designed.
+### src/pages/Reflect.jsx
+**State:** `content` (compose textarea, capped at `MAX_CONTENT_LENGTH = 8000`), `stage` (`idle`|`saving`|`analyzing`), `entries` (paginated, `PAGE_SIZE = 20`), `selectedEntry` (opens `ReflectDetailModal`). Save-and-Reflect calls `api.createReflectEntry`, which returns the entry with its analysis already attempted; the new entry is prepended to the list. Clicking an entry opens `ReflectDetailModal` (original text + AI reflection: mood badge, themes, reflection, observations, next step); Edit re-saves via `api.updateReflectEntry` (clears + re-runs analysis server-side); a failed analysis shows a "try analysis again" action wired to `api.reanalyzeReflectEntry`. Delete goes through a confirm modal via `ReflectEntryCard`.
 
 ---
 
 ## Common Components (Detailed)
 
-### Button.jsx
-
-**Props:** `children`, `variant` ('primary'|'secondary'|'danger'|'ghost'), `size` ('sm'|'md'|'lg'), `loading`, `disabled`, `onClick`, `type`, `className`, `icon` (LucideIcon)
-
-**Variants:**
-- primary: Blue→Purple gradient, glow shadow
-- secondary: Dark glass bg, white border
-- danger: Red tinted bg/border, red glow
-- ghost: Transparent, hover white/5 bg
-
-**Animation:** Framer Motion `whileHover scale(1.02)`, `whileTap scale(0.98)`. Disabled when `loading` or `disabled`.
-
----
-
 ### Card.jsx
+**Props:** `children`, `className`, `hover` (lift -4px), `glow` (blue border on hover), `onClick`.
+**Base style:** `bg-[#09090B]/60 border border-white/10 rounded-2xl p-6`.
 
-**Props:** `children`, `className`, `hover` (lift -4px), `glow` (blue border on hover), `onClick`
-
-**Base style:** `bg-[#09090B]/60 backdrop-blur-xl border border-white/10 rounded-2xl p-6`
-
----
-
-### Input.jsx
-
-**Props:** `label`, `error`, `icon` (LucideIcon), `id`, plus all native input props
-
-**Styling:** Dark glass. Focus border: `#4F8BFF`. Error border: red.
-
----
-
-### Loader.jsx
-
-**Props:** `text` (default 'Loading...'), `fullPage` (boolean)
-
-**Visual:** Pulsing glow ring + spinning Loader2 icon in blue.
-
----
+> **Design note:** `Card.jsx` previously also carried `backdrop-blur-xl`. It was removed as a performance fix — `Card` is the shared primitive behind every repeated card in the app (`ProfileCard`, `StatCard`, `PersonalityCard`, `ReflectEntryCard`, `QuestionCard`), and stacking many simultaneous `backdrop-filter` surfaces in a grid/list is expensive to composite. The semi-transparent background alone reproduces the same visual look against this app's near-flat page background, without the cost. Blur is still used, deliberately, on a handful of single/limited elements: `Navbar.jsx`, `Modal.jsx`, `Loader.jsx`, the main `Chat.jsx`/`Voice.jsx` panels, `ChatInput.jsx`, and the Landing page's hero/nav elements. `ChatBubble.jsx` and `TypingIndicator.jsx` similarly dropped their own blur, since they render inside `Chat.jsx`'s already-blurred outer panel (nested blur was nearly invisible but doubled the compositing cost per message).
 
 ### Modal.jsx
-
-**Props:** `isOpen`, `onClose`, `title`, `children`, `maxWidth` (default 'max-w-md')
-
-**Side effects:** Body scroll lock, Escape key → onClose, backdrop click → onClose.
-
-**Animation:** Framer Motion AnimatePresence. opacity 0→1, scale 0.95→1, y 10→0.
-
----
+**Props:** `isOpen`, `onClose`, `title`, `children`, `maxWidth`. Body scroll lock, Escape key → close, backdrop click → close, backdrop keeps `backdrop-blur-md` (a limited, single-instance overlay). Framer Motion `AnimatePresence`.
 
 ### Navbar.jsx
+Fixed floating pill, keeps `backdrop-blur-xl` (single persistent overlay). Desktop: logo, anchor links, Profiles + auth links. Mobile: hamburger menu. Anchor hash links (`#features`, etc.) only scroll correctly on the Landing page — they appear on every page since Navbar is shared everywhere.
 
-**Structure:** Fixed floating pill at top. Desktop: logo left, anchor links center, Profiles + Get Started right. Mobile: hamburger toggle.
+### Loader.jsx
+**Props:** `text`, `fullPage`. Full-page mode keeps a `backdrop-blur-md` overlay.
 
-**Note:** Anchor hash links (Features, How it Works, etc.) only scroll on Landing page (/). They appear on all pages since Navbar is shared.
+### Other common components
+`Button.jsx` (variants: primary/secondary/danger/ghost; sizes sm/md/lg; loading + icon support), `Input.jsx` (label, icon, error state), `ProtectedRoute.jsx` (see [Route Map](#route-map) above), `AnimatedBackground.jsx` (low-opacity dot-grid background layer, shared across pages).
 
 ---
 
 ## Feature Components (Detailed)
 
-### ProgressCard.jsx
-**Props:** `progress` (0-100), `currentQuestion` (1-indexed), `totalQuestions`
+### PersonalityChart.jsx
+Renders the Big Five (Openness, Conscientiousness, Extraversion, Agreeableness, Neuroticism) as horizontal bars plus an inline-SVG radar chart (no charting library — five axes is simple enough for plain trig + a `<polygon>`). `normalizeScore()` accepts a 0–1 fraction, an already-0–100 number, a numeric string (optionally with `%`), or an object carrying the score under `score`/`value`/`percentage`/`percent` — returns `null` (rendered as "N/A") for anything unparseable, never throws. Trait key lookup tolerates common LLM key variants (`openness_to_experience`, `extroversion`, etc.) via an alias list, case-insensitively. When *no* trait has a score at all, shows "Personality insights aren't available yet" instead of an empty chart — this is the state an existing profile is in until it's re-analyzed under the current Big Five schema.
 
-Animated gradient progress bar using `motion.div` width transition. Blue→Purple gradient fill.
+### ProfileGrid.jsx / ProfileCard.jsx / StatCard.jsx / PersonalityCard.jsx
+Unchanged in shape from before — `ProfileGrid` is a responsive grid ("Create New Twin" tile + `ProfileCard` per profile), `ProfileCard` has an avatar/stats/active-state/delete-modal, `StatCard` is an icon+label+value block, `PersonalityCard` shows tone/style/topics/summary text fields (distinct from the numeric `PersonalityChart`).
 
-### QuestionCard.jsx
-**Props:** `question` (string), `onSubmit` (function), `loading` (bool), `questionIndex` (number)
+### Chat feature components
+`ChatBubble.jsx` (user right/blue-gradient, assistant left/dark-panel, no longer independently blurred — see the Card.jsx note above), `ChatInput.jsx` (auto-growing textarea, Enter to send, disabled while sending), `MessageList.jsx` (auto-scrolls to bottom, renders streaming deltas as they arrive), `TypingIndicator.jsx` (three-dot animation, same bubble style as an assistant message, blur removed for the same nested-blur reason as `ChatBubble`).
 
-Local state: `answer` (string) — resets to '' when `questionIndex` changes. Ctrl+Enter submits. Character count bottom-right.
+### Reflect feature components
+`ReflectEntryCard.jsx` — history list item: date, mood badge (or a pending/failed status badge), truncated content preview, delete button. `ReflectDetailModal.jsx` — full original entry + full AI reflection (mood, themes, reflection, observations, next step), Edit (inline textarea, Save re-runs analysis) and Delete actions. `moodStyles.js` — maps each mood string to a badge color class.
 
-### AnalysisSidebar.jsx
-**Props:** `currentStep` (0-indexed), `totalSteps` (default 10), `answersCount`
-
-Vertical checklist: done (green check), current (blue highlight), pending (grey). Privacy tip card below.
-
-### ProfileGrid.jsx
-**Props:** `profiles`, `selectedProfile`, `onSelect`, `onDelete`
-
-3-column responsive grid. First tile: "Create New Digital Twin" → /analyze. Remaining tiles: ProfileCard.
-
-### ProfileCard.jsx
-**Props:** `profile` ({id, name, created_at, last_used, conversation_count}), `isActive`, `onSelect`, `onDelete`
-
-Local state: `showDeleteModal`, `deleting`. Trash icon → confirm modal → DELETE API call.
-
-### PersonalityCard.jsx
-**Props:** `profileData` (full profile object or null)
-
-Reads: tone, communication_style, humor, directness, energy, sentence_length, confidence, preferred_topics, values, summary. Supports both wrapped (`profileData.profile`) and flat formats.
-
-### StatCard.jsx
-**Props:** `icon` (LucideIcon), `label`, `value`, `subtext` (optional), `color` ('blue'|'purple'|'green')
-
-Colored icon badge left + text block right.
-
----
-
-## Voice Components (NEW)
-
-### CallTimer.jsx
-**Props:** `seconds` (number), `active` (boolean)
-
-Displays `MM:SS` formatted duration. Only animates when `active` is true.
-
-### ConnectionStatus.jsx
-**Props:** `status` ('idle'|'connecting'|'connected'|'ended'|'error')
-
-Colored status badge with matching icon. Green pulse animation when connected.
-
-### SpeakingIndicator.jsx
-**Props:** `twinName`, `isAssistantSpeaking`, `isListening`, `connected`
-
-Large avatar circle (first letter of twin name) with:
-- Pulsing blue ring animation when `isAssistantSpeaking`
-- Steady purple ring when `isListening`
-- Dim when disconnected
-
-### VoiceTranscript.jsx
-**Props:** `transcript` (Array of `{role, text, final}`), `twinInitial` (string)
-
-Scrollable list of transcript entries. User entries right-aligned, assistant left-aligned (with avatar circle). Partial transcripts shown in lighter color, final in full white.
-
-### WaveformVisualizer.jsx
-**Props:** `level` (0–1), `active` (bool), `color` ('blue'|'purple')
-
-Row of animated bars. Bar heights driven by `level` + randomized per-bar offsets. Flat (minimal height) when not active.
-
----
-
-## Chat Components (Previously Stubs — Now DONE)
-
-### ChatBubble.jsx
-User messages: right-aligned, blue gradient bg. Assistant messages: left-aligned, dark glass bg with avatar circle. Framer Motion entrance animation.
-
-### ChatInput.jsx
-Auto-growing textarea. Send button disabled when empty or sending. Enter to send, Shift+Enter for newline. Disabled while `sending` prop is true.
-
-### MessageList.jsx
-Scrollable `overflow-y-auto` container. Auto-scrolls to bottom when new messages arrive (useEffect + ref). Maps messages array to ChatBubble. Filters system messages from display.
-
-### TypingIndicator.jsx
-Three bouncing dots animation. Same left-aligned bubble style as assistant messages. Shown while `isTyping` prop is true.
+### Voice feature components
+`CallTimer.jsx`, `ConnectionStatus.jsx`, `SpeakingIndicator.jsx`, `VoiceTranscript.jsx`, `WaveformVisualizer.jsx` — unchanged in shape; see prop tables in git history if needed, or read the files directly (each is short and self-contained).
 
 ---
 
@@ -526,36 +278,25 @@ Three bouncing dots animation. Same left-aligned bubble style as assistant messa
 | Token | Value | Usage |
 |-------|-------|-------|
 | Page Background | `#050505` | All page backgrounds |
-| Card Background | `#09090B` at 60% opacity | All card surfaces |
+| Card Background | `#09090B` at 60–70% opacity | All card surfaces (no blur on repeated cards — see Card.jsx note above) |
 | Primary Blue | `#4F8BFF` | Primary accents, active borders, glows |
 | Primary Purple | `#8B5CF6` | Secondary accents, gradient end |
 | Text Primary | `#F8FAFC` | Headings and important text |
-| Text Muted | `slate-400` (#94a3b8) | Descriptions, labels, subtext |
+| Text Muted | `slate-400` | Descriptions, labels, subtext |
 | Border Default | `white/10` | All card borders |
-| Border Active | `white/20` | Hover borders |
-| Danger | `red-500` at 10-30% | Delete buttons, error states |
-| Success | `emerald-500` at 10-30% | Completion states |
+| Danger | `red-500` at 10–30% | Delete buttons, error states |
+| Success | `emerald-500` at 10–30% | Completion states |
 
 ### Primary Gradient
 ```
 from-[#4F8BFF] to-[#8B5CF6]
 ```
-Used on: primary buttons, progress bars, hero heading, avatar circles, logo dot, glow backgrounds.
-
-### Background Glow Pattern (all pages)
-```jsx
-<div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] rounded-full bg-[#4F8BFF]/10 blur-[150px]" />
-<div className="absolute top-[20%] right-[-10%] w-[50%] h-[50%] rounded-full bg-[#8B5CF6]/10 blur-[150px]" />
-```
+Used on primary buttons, progress bars, hero heading, avatar circles, logo dot, glow backgrounds.
 
 ### Standard Page Layout
 ```jsx
 <div className="relative min-h-screen bg-[#050505] text-[#F8FAFC] font-sans pb-24">
-  {/* Background Glows */}
-  <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
-    <div className="absolute top-[-10%] left-[-10%] ... bg-[#4F8BFF]/10 blur-[150px]" />
-    <div className="absolute top-[20%] right-[-10%] ... bg-[#8B5CF6]/10 blur-[150px]" />
-  </div>
+  <AnimatedBackground />
   <Navbar />
   <main className="relative z-10 max-w-7xl mx-auto px-6 pt-36">
     {/* Page content */}
@@ -567,15 +308,8 @@ Used on: primary buttons, progress bars, hero heading, avatar circles, logo dot,
 
 ## Reusable Patterns
 
-### Error Banner
-```jsx
-{error && (
-  <div className="mb-8 p-4 bg-red-500/10 border border-red-500/30 rounded-2xl flex items-center gap-3 text-red-400 text-sm">
-    <AlertCircle className="w-5 h-5 shrink-0" />
-    <span>{error}</span>
-  </div>
-)}
-```
+### No Profile Guard (Chat, Voice, Dashboard, Reflect)
+When `selectedProfile` is null, these pages show a "No Twin Selected" fallback with a CTA to `/profiles`, rather than erroring.
 
 ### Async Loading Pattern
 ```jsx
@@ -590,21 +324,16 @@ const doSomething = async () => {
     setLoading(false);
   }
 };
-// Button receives loading={loading} → auto-shows spinner
 ```
 
-### No Profile Guard (used in Chat, Voice, Dashboard)
+### Error Banner
 ```jsx
-if (!selectedProfile) {
-  return (
-    <div className="min-h-screen bg-[#050505] text-white">
-      <Navbar />
-      <div className="pt-40 flex flex-col items-center text-center px-6">
-        {/* Icon + heading + CTA to /profiles */}
-      </div>
-    </div>
-  );
-}
+{error && (
+  <div className="mb-8 p-4 bg-red-500/10 border border-red-500/30 rounded-2xl flex items-center gap-3 text-red-400 text-sm">
+    <AlertCircle className="w-5 h-5 shrink-0" />
+    <span>{error}</span>
+  </div>
+)}
 ```
 
 ---
@@ -617,11 +346,7 @@ npm install
 npm run dev     # Dev server at http://localhost:5173
 npm run build   # Production build to ./dist
 npm run preview # Preview production build
+npm run lint    # ESLint
 ```
 
-**Prerequisites:**
-- Backend must be running at `http://localhost:8000`
-- Ollama must be running locally with model pulled
-- For Voice Chat: `VAPI_PUBLIC_KEY` in backend `.env` + ngrok tunnel running
-
-**Environment variable:** `VITE_VAPI_PUBLIC_KEY` can be set in frontend `.env` as an alternative to reading from the backend config endpoint (the backend `/api/voice/config` endpoint is the primary source).
+**Prerequisites:** Backend running at `http://localhost:8000` (which itself needs MongoDB + Ollama — see `backend.md`). For Google Sign-In: `VITE_GOOGLE_CLIENT_ID` in frontend `.env`, matching the backend's `GOOGLE_CLIENT_ID`. For Voice Chat: backend's Vapi config + tunnel set up (see `README.md`).
