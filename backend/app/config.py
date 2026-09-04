@@ -48,7 +48,7 @@ def _positive_int(value: str | None, default: int) -> int:
 # "unavailable for free").
 
 OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
-OPENROUTER_MODEL = os.environ.get("OPENROUTER_MODEL", "google/gemma-4-26b-a4b-it:free")
+OPENROUTER_MODEL = os.environ.get("OPENROUTER_MODEL", "inclusionai/ling-3.0-flash-fin:free")
 
 # ==========================================================
 # WhatsApp Chat Import

@@ -95,7 +95,10 @@ class TextChatService:
             summary=summary,
         )
 
-        reply = self.client.chat(messages, temperature=0.6, max_tokens=60)
+        # Generous headroom: the current free-tier model spends a chunk
+        # of this budget on hidden reasoning tokens before any actual
+        # reply content, so a tight cap here risks getting back nothing.
+        reply = self.client.chat(messages, temperature=0.6, max_tokens=700)
 
         session["history"] = self.engine.append_message(profile_id, "assistant", reply, channel="text")
 
@@ -131,7 +134,7 @@ class TextChatService:
         )
 
         full_reply = []
-        for token in self.client.stream_chat(messages, temperature=0.6, max_tokens=60):
+        for token in self.client.stream_chat(messages, temperature=0.6, max_tokens=700):
             full_reply.append(token)
             yield token
 
@@ -207,7 +210,7 @@ class TextChatService:
         ]
 
         try:
-            new_summary = self.client.chat(prompt_messages, temperature=0.3, max_tokens=200).strip()
+            new_summary = self.client.chat(prompt_messages, temperature=0.3, max_tokens=700).strip()
         except Exception as e:
             # Covers Ollama being unreachable (RuntimeError from the
             # client) as well as any unexpected parsing failure — either
