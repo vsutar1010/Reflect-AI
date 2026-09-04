@@ -14,7 +14,7 @@ import secrets
 import uuid
 from datetime import datetime, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 
 from app import config
 from app.database import users_collection
@@ -28,6 +28,7 @@ from app.schemas import (
     VerifyOtpRequest,
 )
 from app.services import auth_service, email_service
+from app.services.rate_limiter import RateLimiter, RateLimitExceeded, client_ip
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -36,6 +37,28 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 # (PersonalityAnalyzer.sessions, WhatsAppImportService.pending) — this is
 # short-lived (OTP_EXPIRE_MINUTES) state, not data worth persisting.
 _pending_signups: dict[str, dict] = {}
+
+# Per-client-IP rate limiters — see app/services/rate_limiter.py.
+_login_limiter = RateLimiter(config.AUTH_LOGIN_MAX_ATTEMPTS, config.AUTH_LOGIN_WINDOW_SECONDS)
+_otp_request_limiter = RateLimiter(config.AUTH_OTP_REQUEST_MAX_ATTEMPTS, config.AUTH_OTP_REQUEST_WINDOW_SECONDS)
+
+# A bcrypt hash of a random value nobody knows, hashed once at import
+# time. login() always runs one bcrypt verification against *some*
+# hash — this one when there's no real password to check against
+# (nonexistent email, or an existing Google-only account with no
+# password_hash) — so a nonexistent/Google-only/wrong-password account
+# all cost the same bcrypt-verify time. Without this, skipping bcrypt
+# for the first two cases would make them measurably faster than a
+# real wrong-password attempt, letting an attacker distinguish account
+# type by response time even after the response body/status were
+# unified below.
+_DUMMY_PASSWORD_HASH = auth_service.hash_password(secrets.token_urlsafe(32))
+
+
+def _too_many_requests(message: str, retry_after_seconds: int) -> HTTPException:
+    # Retry-After lets a well-behaved client wait the right amount of time
+    # instead of guessing or hammering the endpoint again immediately.
+    return HTTPException(status_code=429, detail=message, headers={"Retry-After": str(retry_after_seconds)})
 
 
 def _set_session_cookie(response: Response, user_id: str) -> None:
@@ -56,35 +79,69 @@ def _user_response(doc: dict) -> UserResponse:
 
 
 @router.post("/signup/request-otp", response_model=SuccessResponse)
-def request_signup_otp(req: SignupRequest):
-    email = req.email.lower().strip()
-
-    if users_collection.find_one({"email": email}):
-        raise HTTPException(status_code=409, detail="An account with this email already exists.")
-
-    existing = _pending_signups.get(email)
-    if existing and datetime.now() < existing["created_at"] + timedelta(seconds=config.OTP_RESEND_COOLDOWN_SECONDS):
-        raise HTTPException(status_code=400, detail="Please wait a bit before requesting another code.")
-
-    otp = f"{secrets.randbelow(1_000_000):06d}"
-    now = datetime.now()
-    _pending_signups[email] = {
-        "name": req.name.strip(),
-        "email": email,
-        "password_hash": auth_service.hash_password(req.password),
-        "otp": otp,
-        "expires_at": now + timedelta(minutes=config.OTP_EXPIRE_MINUTES),
-        "attempts": 0,
-        "created_at": now,
-    }
-
+def request_signup_otp(req: SignupRequest, request: Request):
+    key = client_ip(request)
     try:
-        email_service.send_otp_email(email, req.name.strip(), otp)
-    except RuntimeError as e:
-        del _pending_signups[email]
-        raise HTTPException(status_code=503, detail=str(e))
+        with _otp_request_limiter.guard(key):
+            # Every call counts here, success or not — this endpoint can
+            # trigger a real email, so the thing being rate-limited is
+            # request volume/cost, not "failures" the way login's is.
+            _otp_request_limiter.record_event(key)
 
-    return SuccessResponse(success=True, message=f"Verification code sent to {email}.")
+            email = req.email.lower().strip()
+            name = req.name.strip()
+
+            # The response below is identical — status, body, and (via the
+            # dummy hash_password() call in the branch that skips a real
+            # send) roughly the same cost — no matter which of these is
+            # true, so an attacker calling this endpoint can never learn
+            # which one happened. Only the real recipient, via their own
+            # inbox (or the lack of a code arriving), ever finds out.
+            account_exists = users_collection.find_one({"email": email}, {"_id": 1}) is not None
+            pending = _pending_signups.get(email)
+            resend_on_cooldown = bool(
+                pending
+                and datetime.now() < pending["created_at"] + timedelta(seconds=config.OTP_RESEND_COOLDOWN_SECONDS)
+            )
+
+            if account_exists or resend_on_cooldown:
+                # Don't send a duplicate code, and don't send a signup code
+                # to an address that's already registered — but still pay
+                # the same bcrypt-hash and SMTP-connect costs the real path
+                # below pays (the SMTP round trip is the dominant one — well
+                # over a second against a real provider), so this branch
+                # isn't measurably faster than it.
+                auth_service.hash_password(req.password)
+                email_service.touch_smtp_connection()
+            else:
+                otp = f"{secrets.randbelow(1_000_000):06d}"
+                now = datetime.now()
+                _pending_signups[email] = {
+                    "name": name,
+                    "email": email,
+                    "password_hash": auth_service.hash_password(req.password),
+                    "otp": otp,
+                    "expires_at": now + timedelta(minutes=config.OTP_EXPIRE_MINUTES),
+                    "attempts": 0,
+                    "created_at": now,
+                }
+                try:
+                    email_service.send_otp_email(email, name, otp)
+                except RuntimeError as e:
+                    # Don't surface this as a different status/body either —
+                    # that would itself be a distinguishing signal. Log it
+                    # server-side and let the response stay generic.
+                    del _pending_signups[email]
+                    print(f"[auth] signup OTP email failed to send: {e}")
+
+            return SuccessResponse(
+                success=True,
+                message="If this email can be used to sign up, a verification code has been sent.",
+            )
+    except RateLimitExceeded as e:
+        raise _too_many_requests(
+            "Too many verification code requests. Please try again later.", e.retry_after_seconds
+        )
 
 
 @router.post("/signup/verify-otp", response_model=UserResponse)
@@ -123,23 +180,34 @@ def verify_signup_otp(req: VerifyOtpRequest, response: Response):
 
 
 @router.post("/login", response_model=UserResponse)
-def login(req: LoginRequest, response: Response):
-    email = req.email.lower().strip()
-    user_doc = users_collection.find_one({"email": email})
+def login(req: LoginRequest, request: Request, response: Response):
+    key = client_ip(request)
+    try:
+        with _login_limiter.guard(key):
+            email = req.email.lower().strip()
+            user_doc = users_collection.find_one({"email": email})
 
-    if not user_doc or not user_doc.get("password_hash"):
-        detail = (
-            "This account uses Google Sign-In — use the Google button instead."
-            if user_doc
-            else "Invalid email or password."
-        )
-        raise HTTPException(status_code=400 if user_doc else 401, detail=detail)
+            # Same response — status, body, and (via the dummy-hash bcrypt
+            # verify above) roughly the same timing — whether the email
+            # doesn't exist, belongs to a Google-only account, or is a
+            # real password account with the wrong password. An attacker
+            # must not be able to tell these apart from the outside;
+            # only the account owner, via the account itself, ever
+            # learns which one it was.
+            password_hash = (user_doc or {}).get("password_hash") or _DUMMY_PASSWORD_HASH
+            password_ok = auth_service.verify_password(req.password, password_hash)
 
-    if not auth_service.verify_password(req.password, user_doc["password_hash"]):
-        raise HTTPException(status_code=401, detail="Invalid email or password.")
+            if not user_doc or not user_doc.get("password_hash") or not password_ok:
+                _login_limiter.record_failure(key)
+                raise HTTPException(status_code=401, detail="Invalid email or password.")
 
-    _set_session_cookie(response, user_doc["_id"])
-    return _user_response(user_doc)
+            # Successful login — any earlier failed attempts from this
+            # client no longer count against them.
+            _login_limiter.reset(key)
+            _set_session_cookie(response, user_doc["_id"])
+            return _user_response(user_doc)
+    except RateLimitExceeded as e:
+        raise _too_many_requests("Too many login attempts. Please try again later.", e.retry_after_seconds)
 
 
 @router.post("/google", response_model=UserResponse)

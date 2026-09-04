@@ -15,7 +15,10 @@ from email.message import EmailMessage
 from app import config
 
 
-def send_otp_email(to_email: str, name: str, otp: str) -> None:
+def _connect() -> smtplib.SMTP:
+    """Opens an authenticated SMTP connection. Raises RuntimeError if SMTP
+    isn't configured. Shared by send_otp_email() and touch_smtp_connection()
+    so both pay the exact same connect/TLS/auth cost."""
     if not config.smtp_configured():
         raise RuntimeError(
             "Email sign-up isn't configured on this server yet — SMTP_USERNAME/"
@@ -23,6 +26,13 @@ def send_otp_email(to_email: str, name: str, otp: str) -> None:
             "for how to generate a Gmail App Password."
         )
 
+    smtp = smtplib.SMTP(config.SMTP_HOST, config.SMTP_PORT, timeout=10)
+    smtp.starttls()
+    smtp.login(config.SMTP_USERNAME, config.SMTP_PASSWORD)
+    return smtp
+
+
+def send_otp_email(to_email: str, name: str, otp: str) -> None:
     message = EmailMessage()
     message["Subject"] = "Your ReflectAI verification code"
     message["From"] = f"{config.SMTP_FROM_NAME} <{config.SMTP_USERNAME}>"
@@ -34,7 +44,28 @@ def send_otp_email(to_email: str, name: str, otp: str) -> None:
         "If you didn't request this, you can ignore this email.\n"
     )
 
-    with smtplib.SMTP(config.SMTP_HOST, config.SMTP_PORT, timeout=10) as smtp:
-        smtp.starttls()
-        smtp.login(config.SMTP_USERNAME, config.SMTP_PASSWORD)
+    with _connect() as smtp:
         smtp.send_message(message)
+
+
+def touch_smtp_connection() -> None:
+    """
+    Opens and immediately closes an authenticated SMTP connection without
+    sending anything — pays the same connect/TLS/auth latency
+    send_otp_email() pays (typically the dominant cost, well over a
+    second against a real mail provider), without delivering a message.
+
+    Used by POST /api/auth/signup/request-otp when it deliberately skips
+    a real send (an already-registered email, or a resend still on
+    cooldown) so the response time stays consistent whether or not a
+    code was actually sent — otherwise an attacker could tell "sent"
+    from "not sent" apart just by how long the request took, even with
+    an identical response body. Never raises — any failure here (SMTP
+    not configured, network hiccup) is irrelevant to the caller, which
+    must return its generic response regardless.
+    """
+    try:
+        with _connect():
+            pass
+    except Exception:
+        pass

@@ -7,6 +7,18 @@ async function handleResponse(res) {
       const errorData = await res.json();
       if (errorData.detail) errorMsg = errorData.detail;
     } catch (_) {}
+
+    // Surface how long to wait, when the server tells us (e.g. login
+    // rate limiting) — appended to whatever message the backend sent,
+    // not a replacement for it.
+    if (res.status === 429) {
+      const retryAfter = parseInt(res.headers.get('retry-after'), 10);
+      if (Number.isFinite(retryAfter) && retryAfter > 0) {
+        const minutes = Math.ceil(retryAfter / 60);
+        errorMsg += ` (try again in about ${minutes} minute${minutes === 1 ? '' : 's'})`;
+      }
+    }
+
     throw new Error(errorMsg);
   }
 

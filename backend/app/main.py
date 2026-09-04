@@ -24,6 +24,10 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    # Retry-After isn't one of the handful of response headers browsers
+    # expose to JS by default on a cross-origin request — without this,
+    # the frontend's 429 handling couldn't read it at all.
+    expose_headers=["Retry-After"],
 )
 
 app.include_router(auth.router)

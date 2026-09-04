@@ -97,6 +97,22 @@ FRONTEND_ORIGIN = os.environ.get("FRONTEND_ORIGIN", "http://localhost:5173")
 # development; set True once the app is served over https in production.
 COOKIE_SECURE = _bool(os.environ.get("COOKIE_SECURE"), default=False)
 
+# Rate limiting for POST /api/auth/login (see app/services/rate_limiter.py
+# for the mechanism). 5 attempts / 15 minutes is a standard, widely-used
+# baseline (comparable to OWASP's authentication cheat sheet) — generous
+# enough that a real user mistyping their password a couple of times is
+# never affected, tight enough to make online brute-forcing impractical.
+AUTH_LOGIN_MAX_ATTEMPTS = _positive_int(os.environ.get("AUTH_LOGIN_MAX_ATTEMPTS"), 5)
+AUTH_LOGIN_WINDOW_SECONDS = _positive_int(os.environ.get("AUTH_LOGIN_WINDOW_SECONDS"), 900)
+
+# Rate limiting for POST /api/auth/signup/request-otp. That endpoint sends
+# a real email per call, so unlike login the risk here is spam/cost (mass-
+# emailing arbitrary addresses, exhausting the SMTP quota) rather than
+# credential brute-forcing — same window, a touch more headroom since a
+# shared office/NAT IP may have several people signing up at once.
+AUTH_OTP_REQUEST_MAX_ATTEMPTS = _positive_int(os.environ.get("AUTH_OTP_REQUEST_MAX_ATTEMPTS"), 5)
+AUTH_OTP_REQUEST_WINDOW_SECONDS = _positive_int(os.environ.get("AUTH_OTP_REQUEST_WINDOW_SECONDS"), 900)
+
 # ==========================================================
 # Email (signup OTP verification)
 # ==========================================================
