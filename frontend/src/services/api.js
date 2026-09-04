@@ -180,6 +180,26 @@ export const api = {
   streamChatMessage: (sessionId, message, callbacks) =>
     streamSSE('/chat/message', { session_id: sessionId, message }, callbacks),
 
+  // Reflect / Journaling
+  createReflectEntry: (profileId, content) =>
+    fetchJSON('/reflect', {
+      method: 'POST',
+      body: JSON.stringify({ profile_id: profileId, content }),
+    }),
+  getReflectEntries: (profileId, { limit, skip } = {}) => {
+    const params = new URLSearchParams();
+    if (profileId) params.set('profile_id', profileId);
+    if (limit) params.set('limit', limit);
+    if (skip) params.set('skip', skip);
+    const qs = params.toString();
+    return fetchJSON(`/reflect${qs ? `?${qs}` : ''}`);
+  },
+  getReflectEntry: (id) => fetchJSON(`/reflect/${id}`),
+  updateReflectEntry: (id, content) =>
+    fetchJSON(`/reflect/${id}`, { method: 'PATCH', body: JSON.stringify({ content }) }),
+  reanalyzeReflectEntry: (id) => fetchJSON(`/reflect/${id}/analyze`, { method: 'POST' }),
+  deleteReflectEntry: (id) => fetchJSON(`/reflect/${id}`, { method: 'DELETE' }),
+
   // Voice Chat Flow (Vapi)
   getVoiceConfig: () => fetchJSON('/voice/config'),
   startVoiceSession: (profileId) =>

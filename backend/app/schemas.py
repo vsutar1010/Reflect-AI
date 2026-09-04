@@ -179,6 +179,38 @@ class SetProfileVoiceRequest(BaseModel):
 
 
 # ==========================================================
+# Reflect / Journaling API
+# ==========================================================
+
+class ReflectAnalysis(BaseModel):
+    status: str  # "pending" | "ready" | "failed"
+    mood: Optional[str] = None
+    themes: List[str] = []
+    reflection: Optional[str] = None
+    observations: Optional[str] = None
+    next_step: Optional[str] = None
+    error: Optional[str] = None
+
+
+class CreateReflectEntryRequest(BaseModel):
+    profile_id: str
+    content: str = Field(..., min_length=1, max_length=8000)
+
+
+class UpdateReflectEntryRequest(BaseModel):
+    content: str = Field(..., min_length=1, max_length=8000)
+
+
+class ReflectEntryResponse(BaseModel):
+    id: str
+    profile_id: str
+    content: str
+    created_at: str
+    updated_at: str
+    analysis: Optional[ReflectAnalysis] = None
+
+
+# ==========================================================
 # Generic API Response
 # ==========================================================
 

@@ -60,11 +60,12 @@ class OllamaClient:
         stream: bool = False,
         temperature: float = 0.7,
         max_tokens: Optional[int] = None,
+        timeout: Optional[float] = None,
     ) -> str:
         request = self._build_request(messages, stream, temperature, max_tokens)
 
         try:
-            with urllib.request.urlopen(request) as response:
+            with urllib.request.urlopen(request, timeout=timeout) as response:
                 if not stream:
                     result = json.loads(response.read().decode("utf-8"))
                     return result["message"]["content"]

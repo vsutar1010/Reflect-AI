@@ -47,6 +47,7 @@ db: Database = client[config.MONGODB_DB_NAME]
 profiles_collection: Collection = db["profiles"]
 conversations_collection: Collection = db["conversations"]
 users_collection: Collection = db["users"]
+reflections_collection: Collection = db["reflections"]
 
 
 def ping() -> None:
@@ -63,3 +64,5 @@ def init_indexes() -> None:
     profiles_collection.create_index([("owner_id", ASCENDING)])
     users_collection.create_index([("email", ASCENDING)], unique=True)
     users_collection.create_index([("google_sub", ASCENDING)], unique=True, sparse=True)
+    reflections_collection.create_index([("owner_id", ASCENDING), ("created_at", ASCENDING)])
+    reflections_collection.create_index([("profile_id", ASCENDING)])

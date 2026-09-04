@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app import config, database
-from app.routers import analyze, auth, chat, profiles, voice
+from app.routers import analyze, auth, chat, profiles, reflect, voice
 
 app = FastAPI(title="ReflectAI API", version="2.0.0")
 
@@ -19,6 +19,7 @@ app.include_router(analyze.router)
 app.include_router(chat.router)
 app.include_router(voice.router)
 app.include_router(profiles.router)
+app.include_router(reflect.router)
 
 
 @app.on_event("startup")
