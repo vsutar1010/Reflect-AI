@@ -250,12 +250,20 @@ class VoiceChatService:
         dynamic_context = self.engine.build_dynamic_context(
             self.engine.get_recent_user_messages(session["history"])
         )
+        # Read-only: TextChatService is what keeps this summary caught up
+        # (see chat.py's _catch_up_summary), since both channels share the
+        # same conversation thread. Voice just needs to include whatever
+        # summary already exists so a long conversation that started or
+        # continued in Text Chat isn't silently dropped once it falls
+        # outside build_context_window's recent-message cap.
+        summary = self.engine.get_summary_state(profile_id)["summary"]
 
         system_messages = ollama_adapter.build_messages(session["context"])
         context_window = self.engine.build_context_window(
             system_messages,
             session["history"],
             dynamic_context=dynamic_context,
+            summary=summary,
         )
 
         full_reply = []
