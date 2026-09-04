@@ -18,6 +18,7 @@ Text chat and analysis run on your own machine by default (local LLM via [Ollama
   - [4. Backend](#4-backend)
   - [5. Frontend](#5-frontend)
   - [6. Run it (text chat only)](#6-run-it-text-chat-only)
+  - [Development vs. production performance](#development-vs-production-performance)
   - [7. Voice chat setup (optional)](#7-voice-chat-setup-optional)
 - [Configuration reference](#configuration-reference)
 - [Where to change things](#where-to-change-things)
@@ -247,6 +248,22 @@ npm run dev
 ```
 
 Open **http://localhost:5173**, sign up (or sign in with Google, if configured), click **Create Twin**, answer the 10 questions (or import a WhatsApp chat export instead), then pick **Text Chat**. Voice Chat will show a clear "not configured yet" screen with a link back to Text Chat until you complete step 7.
+
+### Development vs. production performance
+
+`npm run dev` runs Vite's dev server: unminified React (with extra development-only checks and warnings), on-the-fly per-file transforms, and `React.StrictMode` intentionally rendering components/effects twice to surface side-effect bugs. **This is expected to feel slower than the real app** — it is not a sign of a production problem.
+
+To judge actual performance, build and serve the real production bundle instead:
+
+```bash
+cd frontend
+npm run build
+npm run preview -- --port 5173   # after stopping `npm run dev` first — same port
+```
+
+**Use `--port 5173`, not Vite's default `4173`.** The backend's CORS (`FRONTEND_ORIGIN`) and Google Sign-In are both configured for `http://localhost:5173` only; previewing on the default `4173` port gets rejected by CORS (auth, profiles, dashboard, etc. will all silently fail to load) and by Google's authorized-origins check. This is correct, intentional CORS behavior, not a bug — a real deployment would set `FRONTEND_ORIGIN` to wherever the production frontend is actually hosted, and there's no `localhost:5173` involved at all. If you'd rather keep the default preview port for some other reason, set `FRONTEND_ORIGIN=http://localhost:4173` in `backend/.env` and restart the backend instead.
+
+`React.StrictMode` stays enabled in `src/main.jsx` on purpose — it's a development-only mechanism (React strips its double-invoke behavior from production builds automatically), so it can't be the cause of a real production slowdown, and removing it would just turn off a real bug-detection tool for no benefit.
 
 ### 7. Voice chat setup (optional)
 
