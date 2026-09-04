@@ -296,6 +296,52 @@ while preserving the user's identity.
         self.save_history(profile_id, history, thread)
         return history
 
+    def get_summary_state(self, profile_id: str, thread: str = "default") -> Dict:
+        """
+        Returns the running conversation summary for this thread, plus how
+        many messages (from the start of history) it already covers.
+        Read failures (e.g. Mongo unreachable) return the safe empty
+        state rather than raising — summarization is a best-effort
+        enhancement, never a hard dependency of a chat turn.
+        """
+        try:
+            doc = conversations_collection.find_one(
+                {"_id": self._thread_id(profile_id, thread)}, {"summary": 1, "summarized_through": 1}
+            )
+        except Exception:
+            return {"summary": "", "summarized_through": 0}
+
+        if not doc:
+            return {"summary": "", "summarized_through": 0}
+        return {
+            "summary": doc.get("summary", ""),
+            "summarized_through": doc.get("summarized_through", 0),
+        }
+
+    def save_summary_state(self, profile_id: str, summary: str, summarized_through: int, thread: str = "default") -> None:
+        """
+        Persists the running summary onto the same conversation document
+        `messages` lives on — never touches `messages` itself, so a
+        summarization failure or a later retry can never lose or
+        overwrite actual conversation history.
+        """
+        try:
+            conversations_collection.update_one(
+                {"_id": self._thread_id(profile_id, thread)},
+                {
+                    "$set": {
+                        "profile_id": profile_id,
+                        "thread": thread,
+                        "summary": summary,
+                        "summarized_through": summarized_through,
+                        "summary_updated_at": datetime.now().isoformat(),
+                    }
+                },
+                upsert=True,
+            )
+        except Exception:
+            pass
+
     def get_recent_user_messages(self, history: List[dict], limit: int = 5) -> List[str]:
         messages = []
         for message in reversed(history):
@@ -311,19 +357,37 @@ while preserving the user's identity.
         system_messages: List[Dict[str, str]],
         history: List[dict],
         dynamic_context: Optional[str] = None,
+        summary: Optional[str] = None,
         max_history: int = MAX_HISTORY,
     ) -> List[Dict[str, str]]:
         """
         Assembles the final message list for an LLM call: persistent
-        system messages (always kept, never dropped), then optionally a
-        fresh dynamic-context system message, then the most recent turns
-        of conversation (capped so token usage stays bounded).
+        system messages (always kept, never dropped), then an optional
+        summary of conversation that has already scrolled out of the
+        recent window (so context isn't just silently lost once history
+        exceeds max_history), then optionally a fresh dynamic-context
+        system message, then the most recent turns of conversation
+        (capped so token usage stays bounded).
+
+        `summary` is opt-in (default None) so existing callers — e.g.
+        VoiceChatService — are unaffected unless they explicitly pass one.
         """
         conversation = history[-max_history:] if len(history) > max_history else history
         # Strip the "channel" tag before sending to an LLM — it's UI metadata.
         conversation = [{"role": m["role"], "content": m["content"]} for m in conversation]
 
         messages = list(system_messages)
+        if summary:
+            messages.append(
+                {
+                    "role": "system",
+                    "content": (
+                        "Summary of earlier parts of this conversation (for your "
+                        "context only — do not repeat it verbatim, do not mention "
+                        f"that a summary exists):\n{summary}"
+                    ),
+                }
+            )
         if dynamic_context:
             messages.append({"role": "system", "content": dynamic_context})
         messages.extend(conversation)
