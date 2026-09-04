@@ -114,7 +114,7 @@ export default function Chat() {
       },
       onDone: () => finishStream({ removeIfEmpty: true }),
       onError: (message) => {
-        setError(message || 'Failed to get a reply. Is Ollama running?');
+        setError(message || 'Failed to get a reply. Please try again.');
         finishStream({ removeIfEmpty: true });
       },
     });

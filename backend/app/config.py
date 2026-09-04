@@ -37,11 +37,18 @@ def _positive_int(value: str | None, default: int) -> int:
 
 
 # ==========================================================
-# Ollama (Text Chat + Analysis LLM)
+# OpenRouter (Text Chat + Analysis LLM)
 # ==========================================================
+# A free hosted model, used instead of a local Ollama server so the
+# backend can run on small/free-tier hosting with no local inference
+# hardware. Get a key at https://openrouter.ai/keys (no card required)
+# and pick a currently-free model from
+# https://openrouter.ai/models?max_price=0 (the free catalog rotates —
+# swap OPENROUTER_MODEL if the default starts failing with
+# "unavailable for free").
 
-OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://localhost:11434").rstrip("/")
-OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "mistral:7b-instruct-v0.3-q3_K_S")
+OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
+OPENROUTER_MODEL = os.environ.get("OPENROUTER_MODEL", "google/gemma-4-26b-a4b-it:free")
 
 # ==========================================================
 # WhatsApp Chat Import

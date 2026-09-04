@@ -405,7 +405,7 @@ export default function Analyze() {
              Interview Flow
              ============================================================ */
           loading ? (
-            <Loader text="Connecting to Ollama & initializing interview session..." />
+            <Loader text="Initializing interview session..." />
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
               <div className="lg:col-span-8 space-y-6">

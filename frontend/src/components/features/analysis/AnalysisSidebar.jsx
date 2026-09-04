@@ -50,10 +50,10 @@ export default function AnalysisSidebar({ currentStep = 0, totalSteps = 10, answ
       <div className="bg-white/5 p-4 rounded-2xl border border-white/10 text-xs text-slate-400 space-y-2">
         <div className="flex items-center gap-1.5 font-semibold text-slate-200">
           <ShieldCheck className="w-4 h-4 text-[#8B5CF6]" />
-          <span>Local & Private</span>
+          <span>AI-Powered Analysis</span>
         </div>
         <p className="leading-relaxed">
-          Your responses are processed locally by Ollama to extract linguistic statistics. No personal data leaves your machine.
+          Your responses are sent to an AI model to extract linguistic statistics.
         </p>
       </div>
     </Card>

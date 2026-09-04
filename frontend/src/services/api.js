@@ -1,4 +1,6 @@
-const API_BASE = 'http://localhost:8000/api';
+// Empty string in prod (same-origin, proxied by nginx) is a valid,
+// intentional value — must not fall back to the dev default.
+const API_BASE = `${import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000'}/api`;
 
 async function handleResponse(res) {
   if (!res.ok) {

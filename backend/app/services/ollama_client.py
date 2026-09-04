@@ -1,8 +1,14 @@
 """
-ReflectAI Ollama Client
+ReflectAI LLM Client
 
-This module is responsible for communicating with the local
-Ollama server.
+This module is responsible for communicating with OpenRouter's free-tier
+hosted models over its OpenAI-compatible chat completions API.
+
+Kept the name `OllamaClient`/`ollama_client.py` (originally a local
+Ollama server) to avoid touching every call site — the class still
+exposes the same chat/stream_chat/health_check interface, only the
+backend behind it changed, so Analysis, Text Chat, and Voice Chat's
+custom-llm proxy can run without any local LLM hardware.
 
 All AI interactions (Analysis, Text Chat, and Voice Chat's custom-llm
 proxy) go through this client.
@@ -15,14 +21,15 @@ import urllib.error
 import urllib.request
 from typing import Dict, Iterator, List, Optional
 
-from app.config import OLLAMA_HOST, OLLAMA_MODEL
+from app.config import OPENROUTER_API_KEY, OPENROUTER_MODEL
 
-CHAT_ENDPOINT = f"{OLLAMA_HOST}/api/chat"
+CHAT_ENDPOINT = "https://openrouter.ai/api/v1/chat/completions"
+MODELS_ENDPOINT = "https://openrouter.ai/api/v1/models"
 
 
 class OllamaClient:
 
-    def __init__(self, model: str = OLLAMA_MODEL):
+    def __init__(self, model: str = OPENROUTER_MODEL):
         self.model = model
 
     def set_model(self, model: str):
@@ -36,21 +43,22 @@ class OllamaClient:
         temperature: float,
         max_tokens: Optional[int],
     ) -> urllib.request.Request:
-        options = {"temperature": temperature}
-        if max_tokens is not None:
-            options["num_predict"] = max_tokens
-
         payload = {
             "model": self.model,
             "messages": messages,
             "stream": stream,
-            "options": options,
+            "temperature": temperature,
         }
+        if max_tokens is not None:
+            payload["max_tokens"] = max_tokens
 
         return urllib.request.Request(
             CHAT_ENDPOINT,
             data=json.dumps(payload).encode("utf-8"),
-            headers={"Content-Type": "application/json"},
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+            },
             method="POST",
         )
 
@@ -62,37 +70,21 @@ class OllamaClient:
         max_tokens: Optional[int] = None,
         timeout: Optional[float] = None,
     ) -> str:
-        request = self._build_request(messages, stream, temperature, max_tokens)
+        request = self._build_request(messages, stream=False, temperature=temperature, max_tokens=max_tokens)
 
         try:
             with urllib.request.urlopen(request, timeout=timeout) as response:
-                if not stream:
-                    result = json.loads(response.read().decode("utf-8"))
-                    return result["message"]["content"]
-
-                complete_response = ""
-                while True:
-                    line = response.readline()
-                    if not line:
-                        break
-                    decoded = line.decode().strip()
-                    if not decoded:
-                        continue
-                    chunk = json.loads(decoded)
-                    complete_response += chunk.get("message", {}).get("content", "")
-                    if chunk.get("done"):
-                        break
-
-                return complete_response
+                result = json.loads(response.read().decode("utf-8"))
+                return result["choices"][0]["message"]["content"]
 
         except urllib.error.HTTPError as exc:
-            raise RuntimeError(f"Ollama HTTP Error ({exc.code})") from exc
+            body = exc.read().decode("utf-8", errors="replace")
+            raise RuntimeError(f"OpenRouter HTTP Error ({exc.code}): {body}") from exc
         except urllib.error.URLError as exc:
             raise RuntimeError(
-                f"Unable to connect to Ollama.\n"
-                f"Host : {OLLAMA_HOST}\n"
+                f"Unable to reach OpenRouter.\n"
                 f"Model: {self.model}\n\n"
-                f"Make sure Ollama is running."
+                f"Check OPENROUTER_API_KEY and network access."
             ) from exc
 
     def stream_chat(
@@ -102,7 +94,7 @@ class OllamaClient:
         max_tokens: Optional[int] = None,
     ) -> Iterator[str]:
         """
-        Yields the reply token-by-token as Ollama generates it, instead of
+        Yields the reply token-by-token as it's generated, instead of
         waiting for the full reply. Used by the Voice Chat custom-llm
         proxy: streaming the first token to Vapi as soon as it exists is
         the difference between the twin feeling responsive and feeling
@@ -116,31 +108,35 @@ class OllamaClient:
                     line = response.readline()
                     if not line:
                         break
-                    decoded = line.decode().strip()
-                    if not decoded:
+                    decoded = line.decode("utf-8").strip()
+                    if not decoded or not decoded.startswith("data:"):
                         continue
-                    chunk = json.loads(decoded)
-                    token = chunk.get("message", {}).get("content", "")
+                    data = decoded[len("data:"):].strip()
+                    if data == "[DONE]":
+                        break
+                    chunk = json.loads(data)
+                    token = chunk["choices"][0].get("delta", {}).get("content", "")
                     if token:
                         yield token
-                    if chunk.get("done"):
-                        break
 
         except urllib.error.HTTPError as exc:
-            raise RuntimeError(f"Ollama HTTP Error ({exc.code})") from exc
+            body = exc.read().decode("utf-8", errors="replace")
+            raise RuntimeError(f"OpenRouter HTTP Error ({exc.code}): {body}") from exc
         except urllib.error.URLError as exc:
             raise RuntimeError(
-                f"Unable to connect to Ollama.\n"
-                f"Host : {OLLAMA_HOST}\n"
+                f"Unable to reach OpenRouter.\n"
                 f"Model: {self.model}\n\n"
-                f"Make sure Ollama is running."
+                f"Check OPENROUTER_API_KEY and network access."
             ) from exc
 
     def health_check(self) -> bool:
-        """Returns True if Ollama server is reachable."""
+        """Returns True if OpenRouter is reachable with the configured key."""
         try:
-            request = urllib.request.Request(OLLAMA_HOST, method="GET")
-            urllib.request.urlopen(request)
+            request = urllib.request.Request(
+                MODELS_ENDPOINT,
+                headers={"Authorization": f"Bearer {OPENROUTER_API_KEY}"},
+            )
+            urllib.request.urlopen(request, timeout=5)
             return True
         except Exception:
             return False
