@@ -19,3 +19,11 @@ services:
       - backend
     ports:
       - "80:80"
+      - "443:443"
+    volumes:
+      # Shared with certbot on the host: /certbot-www serves the ACME
+      # HTTP-01 challenge, /etc/letsencrypt holds the issued cert once
+      # HTTPS is enabled (see nginx.conf.https, swapped in after the
+      # first successful certbot run).
+      - ./certbot-www:/var/www/certbot:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
