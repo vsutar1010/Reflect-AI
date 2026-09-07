@@ -2,7 +2,7 @@
 """
 ReflectAI evaluation harness  --  WIRED TO THE REAL BACKEND
 ===========================================================
-Verified against github.com/vsutar1010/Reflect-AI:
+Verified against github.com:
 
     app.services.communication_analyzer.CommunicationAnalyzer.analyze(messages)
     app.services.twin_engine.DigitalTwinEngine()            # no constructor args

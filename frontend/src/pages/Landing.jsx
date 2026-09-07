@@ -152,7 +152,7 @@ export default function Landing() {
                 Live Clone Signal
               </div>
               <div className="bg-black/40 backdrop-blur-md border border-white/10 rounded-full px-3 py-1 text-xs text-[#8B5CF6] font-semibold">
-                Ollama Engine
+                AI Twin Engine
               </div>
             </div>
 
@@ -199,7 +199,7 @@ export default function Landing() {
             {[
               { step: '01', title: 'Record Voice', icon: Mic, desc: 'Provide vocal samples to capture your tone, speed, and patterns.' },
               { step: '02', title: 'Analyze Behavior', icon: TrendingUp, desc: 'Linguistic analyzers extract punctuation, text patterns, and formatting.' },
-              { step: '03', title: 'Generate Prompts', icon: Cpu, desc: 'Ollama generates an immutable system identity instruction.' },
+              { step: '03', title: 'Generate Prompts', icon: Cpu, desc: 'The AI engine generates an immutable system identity instruction.' },
               { step: '04', title: 'Clone Identity', icon: UserCheck, desc: 'A secure, sandboxed profile file maps your digital twin.' },
               { step: '05', title: 'Chat Naturally', icon: MessageSquare, desc: 'Interact with your clone using real-time dynamic context.' }
             ].map((item, idx) => (
@@ -329,20 +329,6 @@ export default function Landing() {
               <h4 className="text-lg font-bold text-white mb-3">Cognitive Memory Layer</h4>
               <p className="text-xs text-slate-400 leading-relaxed">
                 Stores context summaries, user preferences, and custom values securely across chat sessions without losing personality.
-              </p>
-            </motion.div>
-
-            {/* Card 6: Local AI */}
-            <motion.div 
-              className="group p-8 bg-[#09090B]/60 border border-white/5 hover:border-[#8B5CF6]/30 rounded-3xl shadow-xl transition-all duration-300 flex flex-col justify-center"
-              whileHover={{ y: -8 }}
-            >
-              <div className="p-4 w-14 h-14 rounded-2xl bg-[#8B5CF6]/10 text-[#8B5CF6] mb-6 flex items-center justify-center">
-                <Cpu className="w-7 h-7" />
-              </div>
-              <h4 className="text-lg font-bold text-white mb-3">Local Ollama Engine</h4>
-              <p className="text-xs text-slate-400 leading-relaxed">
-                Keeps your files private. Run entire analyses and chat twins directly using local open-source models like Mistral and Qwen.
               </p>
             </motion.div>
           </div>
@@ -482,7 +468,7 @@ export default function Landing() {
         <div className="max-w-7xl mx-auto px-6 text-center">
           <p className="text-xs uppercase tracking-widest text-[#8B5CF6] font-bold mb-8">Integrated Technologies</p>
           <div className="flex flex-wrap items-center justify-center gap-8 md:gap-16 opacity-40 hover:opacity-60 transition-opacity duration-300">
-            {['FastAPI', 'React', 'Ollama', 'MongoDB', 'Tailwind', 'Vapi', 'LangGraph', 'Whisper'].map((tech, idx) => (
+            {['FastAPI', 'React', 'OpenRouter', 'MongoDB', 'Tailwind', 'Vapi'].map((tech, idx) => (
               <span key={idx} className="text-base md:text-lg font-mono font-bold tracking-wider text-slate-400">
                 {tech}
               </span>
@@ -503,9 +489,8 @@ export default function Landing() {
 
           <div className="flex items-center gap-8">
             <a href="https://github.com" target="_blank" rel="noopener noreferrer" className="text-xs text-slate-400 hover:text-white transition-colors">Github</a>
-            <a href="https://linkedin.com" target="_blank" rel="noopener noreferrer" className="text-xs text-slate-400 hover:text-white transition-colors">LinkedIn</a>
-            <a href="#docs" className="text-xs text-slate-400 hover:text-white transition-colors">Documentation</a>
-            <a href="#privacy" className="text-xs text-slate-400 hover:text-white transition-colors">Privacy Policy</a>
+            <a href="https://drive.google.com/file/d/1yt44K3JSV8k-s4OMm_hrn_qfH6eXGnBO/view?usp=drivesdk" target="_blank" rel="noopener noreferrer" className="text-xs text-slate-400 hover:text-white transition-colors">Documentation</a>
+            <a href="https://drive.google.com/file/d/15_XqFhSHO3M9yMloZXqNDtJMKqWrXP3Q/view?usp=drivesdk" target="_blank" rel="noopener noreferrer" className="text-xs text-slate-400 hover:text-white transition-colors">Privacy Policy</a>
           </div>
         </div>
       </footer>
