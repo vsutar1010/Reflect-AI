@@ -53,16 +53,23 @@ from app.config import (
     voice_enabled,
 )
 from app.services.ollama_client import OllamaClient
+from app.services.rag import context_builder
 from app.services.twin_engine import DigitalTwinEngine, SessionNotFoundError
 
 MAX_CALL_DURATION_SECONDS = 900  # 15 minutes — keeps a stray open call bounded
 
 
 class VoiceChatService:
-    def __init__(self, engine: DigitalTwinEngine | None = None):
+    def __init__(self, engine: DigitalTwinEngine | None = None, memory_indexer=None, retrieval_agent=None):
         self.engine = engine or DigitalTwinEngine()
         self.client = OllamaClient()
         self.sessions: Dict[str, dict] = {}
+        # RAG only applies on the custom-llm path (see stream_turn) —
+        # vapi-native mode never calls back into this backend per-turn,
+        # so there's no hook to inject retrieved memory into (same
+        # existing limitation documented for conversation summaries).
+        self.memory_indexer = memory_indexer
+        self.retrieval_agent = retrieval_agent
 
     # ============================================================
     # Configuration status
@@ -242,10 +249,13 @@ class VoiceChatService:
                 latest_user_message = m.get("content", "")
                 break
 
+        owner_id = session["owner_id"]
+
         if latest_user_message and (not session["history"] or session["history"][-1].get("content") != latest_user_message):
             session["history"] = self.engine.append_message(
                 profile_id, "user", latest_user_message, channel="voice"
             )
+            self._index_turn(owner_id, profile_id, "user", latest_user_message, len(session["history"]))
 
         dynamic_context = self.engine.build_dynamic_context(
             self.engine.get_recent_user_messages(session["history"])
@@ -257,6 +267,7 @@ class VoiceChatService:
         # continued in Text Chat isn't silently dropped once it falls
         # outside build_context_window's recent-message cap.
         summary = self.engine.get_summary_state(profile_id)["summary"]
+        memory_context = self._retrieve_memory_context(owner_id, profile_id, latest_user_message or "")
 
         system_messages = ollama_adapter.build_messages(session["context"])
         context_window = self.engine.build_context_window(
@@ -264,6 +275,7 @@ class VoiceChatService:
             session["history"],
             dynamic_context=dynamic_context,
             summary=summary,
+            memory_context=memory_context,
         )
 
         full_reply = []
@@ -280,6 +292,33 @@ class VoiceChatService:
             session["history"] = self.engine.append_message(
                 profile_id, "assistant", reply_text, channel="voice"
             )
+            self._index_turn(owner_id, profile_id, "assistant", reply_text, len(session["history"]))
+
+    # ============================================================
+    # RAG — long-term memory (custom-llm path only; see __init__)
+    # ============================================================
+
+    def _retrieve_memory_context(self, owner_id: str, profile_id: str, message: str) -> Optional[str]:
+        if self.retrieval_agent is None or not message:
+            return None
+        try:
+            result = self.retrieval_agent.retrieve(owner_id, profile_id, message)
+            if not result.memories:
+                return None
+            return context_builder.build_memory_context(result.memories)
+        except Exception as e:
+            print(f"[rag] voice retrieval failed for profile {profile_id}, continuing without memory context: {e}")
+            return None
+
+    def _index_turn(self, owner_id: str, profile_id: str, role: str, content: str, history_len: int) -> None:
+        if self.memory_indexer is None:
+            return
+        try:
+            self.memory_indexer.index_conversation_turn(
+                profile_id, owner_id, role, content, thread="default", turn_index=history_len - 1, channel="voice"
+            )
+        except Exception as e:
+            print(f"[rag] failed to index voice turn for profile {profile_id}: {e}")
 
     # ============================================================
     # Webhook events
@@ -336,9 +375,15 @@ class VoiceChatService:
         new_turns = turns[1:]
 
         profile_id = session["profile_id"]
+        owner_id = session["owner_id"]
         for turn in new_turns:
             content = (turn.get("content") or "").strip()
             if content:
                 session["history"] = self.engine.append_message(
                     profile_id, turn["role"], content, channel="voice"
                 )
+                # vapi-native never triggers live retrieval (no per-turn
+                # hook into this backend), but the transcript is still
+                # worth indexing so it's searchable from a later Text
+                # Chat or custom-llm voice turn.
+                self._index_turn(owner_id, profile_id, turn["role"], content, len(session["history"]))

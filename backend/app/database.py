@@ -49,6 +49,14 @@ conversations_collection: Collection = db["conversations"]
 users_collection: Collection = db["users"]
 reflections_collection: Collection = db["reflections"]
 
+# RAG long-term memory index (see app/services/rag/). A separate
+# collection from `profiles`/`conversations` — those remain the source
+# of truth, this is purely a derived, re-buildable index over them.
+# _id is a deterministic "{profile_id}:{source_type}:{source_id}" string
+# (see MemoryRecord.doc_id), so re-indexing the same source data is an
+# idempotent upsert, never a duplicate.
+memories_collection: Collection = db["memories"]
+
 
 def ping() -> None:
     """
@@ -66,3 +74,12 @@ def init_indexes() -> None:
     users_collection.create_index([("google_sub", ASCENDING)], unique=True, sparse=True)
     reflections_collection.create_index([("owner_id", ASCENDING), ("created_at", ASCENDING)])
     reflections_collection.create_index([("profile_id", ASCENDING)])
+
+    # Ordinary (non-vector) indexes for the memory layer — scoping
+    # queries by profile/user, and the brute-force cosine-search
+    # fallback's scan. The vector search index itself (for
+    # $vectorSearch) is managed separately via
+    # backend/scripts/setup_memory_vector_index.py, since it requires
+    # Atlas Search support and shouldn't be able to fail app startup.
+    memories_collection.create_index([("profile_id", ASCENDING), ("user_id", ASCENDING)])
+    memories_collection.create_index([("profile_id", ASCENDING), ("source_type", ASCENDING)])

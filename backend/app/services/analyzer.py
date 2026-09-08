@@ -16,11 +16,18 @@ from app.services.ollama_client import OllamaClient
 
 class PersonalityAnalyzer:
 
-    def __init__(self):
+    def __init__(self, memory_indexer=None):
 
         self.communication = CommunicationAnalyzer()
 
         self.ollama = OllamaClient()
+
+        # Optional: indexes the interview/WhatsApp transcript into the
+        # RAG memory layer right after a profile is created, so it's
+        # searchable from the very first chat turn instead of needing a
+        # manual backfill. None is a valid value (e.g. in tests that
+        # don't wire RAG) — indexing is then simply skipped.
+        self.memory_indexer = memory_indexer
 
         # Temporary in-memory sessions
         # MongoDB will replace this later.
@@ -723,7 +730,9 @@ Rules
 
         session = self.get_session(session_id)
 
-        result = self._build_and_save_profile(session["messages"], profile_name, session["owner_id"])
+        result = self._build_and_save_profile(
+            session["messages"], profile_name, session["owner_id"], source_type="interview"
+        )
 
         # Kept on the session for get_personality()/get_communication()/
         # export_session() — not used by the WhatsApp import path, which
@@ -749,7 +758,7 @@ Rules
         from a parsed chat export instead of a Q&A session.
         """
 
-        result = self._build_and_save_profile(messages, profile_name, owner_id)
+        result = self._build_and_save_profile(messages, profile_name, owner_id, source_type="whatsapp")
 
         return {
             "profile_id": result["profile_id"],
@@ -761,7 +770,8 @@ Rules
         self,
         messages,
         profile_name: str = None,
-        owner_id: str = None
+        owner_id: str = None,
+        source_type: str = "interview",
     ):
         """
         Shared tail of both profile-creation paths: measured
@@ -828,6 +838,18 @@ Rules
 
         except Exception as e:
             raise RuntimeError(f"Failed to create profile: {e}")
+
+        # Best-effort: index this profile's source transcript into the
+        # RAG memory layer. Never allowed to fail profile creation —
+        # the profile above is already saved and returned regardless.
+        if self.memory_indexer is not None:
+            try:
+                if source_type == "whatsapp":
+                    self.memory_indexer.index_whatsapp(profile_id, owner_id, messages)
+                else:
+                    self.memory_indexer.index_interview(profile_id, owner_id, messages)
+            except Exception as e:
+                print(f"[rag] failed to index profile {profile_id} source data: {e}")
 
         return {
             "profile_id": profile_id,

@@ -48,6 +48,24 @@ def send_otp_email(to_email: str, name: str, otp: str) -> None:
         smtp.send_message(message)
 
 
+def send_password_reset_email(to_email: str, name: str, otp: str) -> None:
+    message = EmailMessage()
+    message["Subject"] = "Your ReflectAI password reset code"
+    message["From"] = f"{config.SMTP_FROM_NAME} <{config.SMTP_USERNAME}>"
+    message["To"] = to_email
+    greeting = f"Hi {name}," if name else "Hi,"
+    message.set_content(
+        f"{greeting}\n\n"
+        f"Your ReflectAI password reset code is: {otp}\n\n"
+        f"This code expires in {config.OTP_EXPIRE_MINUTES} minutes. "
+        "If you didn't request this, you can safely ignore this email — "
+        "your password won't be changed.\n"
+    )
+
+    with _connect() as smtp:
+        smtp.send_message(message)
+
+
 def touch_smtp_connection() -> None:
     """
     Opens and immediately closes an authenticated SMTP connection without

@@ -43,11 +43,10 @@ export default function Navbar() {
           <a href="#features" className="text-sm text-slate-400 hover:text-white transition-colors">Features</a>
           <a href="#how-it-works" className="text-sm text-slate-400 hover:text-white transition-colors">How it Works</a>
           <a href="#technology" className="text-sm text-slate-400 hover:text-white transition-colors">Technology</a>
-          <a href="#pricing" className="text-sm text-slate-400 hover:text-white transition-colors">Pricing</a>
-          <a 
-            href="https://github.com" 
-            target="_blank" 
-            rel="noopener noreferrer" 
+          <a
+            href="https://github.com/vsutar1010/Reflect-AI"
+            target="_blank"
+            rel="noopener noreferrer"
             className="text-sm text-slate-400 hover:text-white flex items-center gap-1.5 transition-colors"
           >
             <GithubIcon className="w-4 h-4" /> Github
@@ -96,8 +95,7 @@ export default function Navbar() {
           <a href="#features" className="text-sm text-slate-400 hover:text-white transition-colors" onClick={() => setIsOpen(false)}>Features</a>
           <a href="#how-it-works" className="text-sm text-slate-400 hover:text-white transition-colors" onClick={() => setIsOpen(false)}>How it Works</a>
           <a href="#technology" className="text-sm text-slate-400 hover:text-white transition-colors" onClick={() => setIsOpen(false)}>Technology</a>
-          <a href="#pricing" className="text-sm text-slate-400 hover:text-white transition-colors" onClick={() => setIsOpen(false)}>Pricing</a>
-          <a href="https://github.com" target="_blank" rel="noopener noreferrer" className="text-sm text-slate-400 hover:text-white flex items-center gap-1.5 transition-colors">
+          <a href="https://github.com/vsutar1010/Reflect-AI" target="_blank" rel="noopener noreferrer" className="text-sm text-slate-400 hover:text-white flex items-center gap-1.5 transition-colors">
             <GithubIcon className="w-4 h-4" /> Github
           </a>
           <div className="flex flex-col gap-2 pt-2 border-t border-white/5">

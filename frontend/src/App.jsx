@@ -11,6 +11,7 @@ import Loader from './components/common/Loader';
 const Landing = lazy(() => import('./pages/Landing'));
 const Login = lazy(() => import('./pages/Login'));
 const Signup = lazy(() => import('./pages/Signup'));
+const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
 const Analyze = lazy(() => import('./pages/Analyze'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Reflect = lazy(() => import('./pages/Reflect'));
@@ -29,6 +30,7 @@ export default function App() {
               <Route path="/" element={<Landing />} />
               <Route path="/login" element={<Login />} />
               <Route path="/signup" element={<Signup />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/analyze" element={<ProtectedRoute><Analyze /></ProtectedRoute>} />
               <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
               <Route path="/reflect" element={<ProtectedRoute><Reflect /></ProtectedRoute>} />

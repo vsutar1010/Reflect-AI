@@ -133,6 +133,17 @@ export const api = {
   logout: () => fetchJSON('/auth/logout', { method: 'POST' }),
   me: () => fetchJSON('/auth/me'),
 
+  // Forgot / reset password
+  requestPasswordReset: (email) =>
+    fetchJSON('/auth/forgot-password/request', { method: 'POST', body: JSON.stringify({ email }) }),
+  verifyPasswordResetCode: (email, otp) =>
+    fetchJSON('/auth/forgot-password/verify', { method: 'POST', body: JSON.stringify({ email, otp }) }),
+  resetPassword: (email, otp, newPassword) =>
+    fetchJSON('/auth/forgot-password/reset', {
+      method: 'POST',
+      body: JSON.stringify({ email, otp, new_password: newPassword }),
+    }),
+
   // Profiles
   getProfiles: () => fetchJSON('/profiles'),
   getProfile: (id) => fetchJSON(`/profiles/${id}`),

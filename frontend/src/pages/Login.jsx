@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { Mail, Lock, LogIn } from 'lucide-react';
 import Card from '../components/common/Card';
 import Input from '../components/common/Input';
+import PasswordInput from '../components/common/PasswordInput';
 import Button from '../components/common/Button';
 import GoogleSignInButton from '../components/common/GoogleSignInButton';
 import AnimatedBackground from '../components/common/AnimatedBackground';
@@ -63,16 +64,23 @@ export default function Login() {
               onChange={(e) => setEmail(e.target.value)}
               required
             />
-            <Input
-              id="password"
-              type="password"
-              label="Password"
-              icon={Lock}
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
+            <div className="flex flex-col gap-1.5">
+              <PasswordInput
+                id="password"
+                label="Password"
+                icon={Lock}
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
+              <Link
+                to="/forgot-password"
+                className="self-end text-xs text-slate-400 hover:text-[#4F8BFF] font-medium transition-colors"
+              >
+                Forgot password?
+              </Link>
+            </div>
 
             {error && <p className="text-xs text-red-400 font-medium text-center">{error}</p>}
 

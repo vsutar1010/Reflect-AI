@@ -20,12 +20,15 @@ from app import config
 from app.database import users_collection
 from app.dependencies import get_current_user
 from app.schemas import (
+    ForgotPasswordRequest,
     GoogleAuthRequest,
     LoginRequest,
+    ResetPasswordRequest,
     SignupRequest,
     SuccessResponse,
     UserResponse,
     VerifyOtpRequest,
+    VerifyResetCodeRequest,
 )
 from app.services import auth_service, email_service
 from app.services.rate_limiter import RateLimiter, RateLimitExceeded, client_ip
@@ -38,9 +41,17 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 # short-lived (OTP_EXPIRE_MINUTES) state, not data worth persisting.
 _pending_signups: dict[str, dict] = {}
 
+# Password resets awaiting code verification, keyed by lowercased email.
+# Same shape/lifetime pattern as _pending_signups above — see
+# request_password_reset() below.
+_pending_resets: dict[str, dict] = {}
+
 # Per-client-IP rate limiters — see app/services/rate_limiter.py.
 _login_limiter = RateLimiter(config.AUTH_LOGIN_MAX_ATTEMPTS, config.AUTH_LOGIN_WINDOW_SECONDS)
 _otp_request_limiter = RateLimiter(config.AUTH_OTP_REQUEST_MAX_ATTEMPTS, config.AUTH_OTP_REQUEST_WINDOW_SECONDS)
+# Reuses the same limits as signup's OTP request limiter — same kind of
+# endpoint (sends a real email, cost/spam is the risk being bounded).
+_reset_request_limiter = RateLimiter(config.AUTH_OTP_REQUEST_MAX_ATTEMPTS, config.AUTH_OTP_REQUEST_WINDOW_SECONDS)
 
 # A bcrypt hash of a random value nobody knows, hashed once at import
 # time. login() always runs one bcrypt verification against *some*
@@ -177,6 +188,133 @@ def verify_signup_otp(req: VerifyOtpRequest, response: Response):
 
     _set_session_cookie(response, user_doc["_id"])
     return _user_response(user_doc)
+
+
+@router.post("/forgot-password/request", response_model=SuccessResponse)
+def request_password_reset(req: ForgotPasswordRequest, request: Request):
+    """
+    Step 1 of the reset flow, and also what "Resend code" calls again.
+    Mirrors request_signup_otp()'s account-enumeration protections
+    exactly: identical response, and identical timing cost (a real SMTP
+    connect either way), regardless of whether the email is registered,
+    is a Google-only account with no password to reset, or a resend is
+    still on cooldown.
+    """
+    key = client_ip(request)
+    try:
+        with _reset_request_limiter.guard(key):
+            _reset_request_limiter.record_event(key)
+
+            email = req.email.lower().strip()
+            user_doc = users_collection.find_one({"email": email})
+            pending = _pending_resets.get(email)
+            resend_on_cooldown = bool(
+                pending
+                and datetime.now() < pending["created_at"] + timedelta(seconds=config.OTP_RESEND_COOLDOWN_SECONDS)
+            )
+
+            # Only an account with a real password has anything to reset
+            # here — a Google-only account (password_hash is None) signs
+            # in via Google, not a password, so there's nothing to send.
+            can_send = user_doc is not None and bool(user_doc.get("password_hash")) and not resend_on_cooldown
+
+            if can_send:
+                otp = f"{secrets.randbelow(1_000_000):06d}"
+                now = datetime.now()
+                _pending_resets[email] = {
+                    "user_id": user_doc["_id"],
+                    "otp": otp,
+                    "expires_at": now + timedelta(minutes=config.OTP_EXPIRE_MINUTES),
+                    "attempts": 0,
+                    "created_at": now,
+                }
+                try:
+                    email_service.send_password_reset_email(email, user_doc.get("name", ""), otp)
+                except RuntimeError as e:
+                    del _pending_resets[email]
+                    print(f"[auth] password reset email failed to send: {e}")
+            else:
+                email_service.touch_smtp_connection()
+
+            return SuccessResponse(
+                success=True,
+                message="If this email is registered, a password reset code has been sent.",
+            )
+    except RateLimitExceeded as e:
+        raise _too_many_requests(
+            "Too many password reset requests. Please try again later.", e.retry_after_seconds
+        )
+
+
+def _check_reset_code(email: str, otp: str) -> dict:
+    """
+    Shared validation for both /forgot-password/verify (a non-consuming
+    pre-check, so the frontend can move to the next step before asking
+    for a new password) and /forgot-password/reset (which re-validates
+    the same way — never trusts that verify was actually called first).
+    Both share one attempt counter per pending reset, so the combined
+    guess budget across the two endpoints is still capped at
+    OTP_MAX_ATTEMPTS. Raises HTTPException on any invalid/expired/
+    exhausted case; returns the pending record on success.
+    """
+    pending = _pending_resets.get(email)
+
+    if not pending or datetime.now() > pending["expires_at"]:
+        _pending_resets.pop(email, None)
+        raise HTTPException(status_code=400, detail="No pending reset for this email — request a new code.")
+
+    pending["attempts"] += 1
+    if pending["attempts"] > config.OTP_MAX_ATTEMPTS:
+        del _pending_resets[email]
+        raise HTTPException(status_code=400, detail="Too many incorrect attempts — request a new code.")
+
+    if otp != pending["otp"]:
+        raise HTTPException(status_code=400, detail="Incorrect code.")
+
+    return pending
+
+
+@router.post("/forgot-password/verify", response_model=SuccessResponse)
+def verify_password_reset_code(req: VerifyResetCodeRequest):
+    """
+    Step 2: lets the frontend confirm the code before showing the new-
+    password fields. Deliberately does NOT consume/delete the pending
+    reset — the code is only actually invalidated once the password is
+    changed (see reset_password below), so a user who verifies
+    successfully but then closes the tab can still use the same code
+    again within its expiry window instead of it being silently burned
+    here.
+    """
+    email = req.email.lower().strip()
+    _check_reset_code(email, req.otp)
+    return SuccessResponse(success=True, message="Code verified. You can now set a new password.")
+
+
+@router.post("/forgot-password/reset", response_model=SuccessResponse)
+def reset_password(req: ResetPasswordRequest):
+    """
+    Step 3: re-validates the code (never trusts that /verify was called
+    first — this is the only endpoint that actually changes anything)
+    and, on success, hashes the new password with the same bcrypt
+    mechanism every other account uses and overwrites password_hash.
+    The code is deleted the moment it's confirmed valid, before the
+    password write — a single successful reset always consumes it, so
+    it can never be replayed.
+    """
+    email = req.email.lower().strip()
+    pending = _check_reset_code(email, req.otp)
+
+    del _pending_resets[email]
+
+    new_hash = auth_service.hash_password(req.new_password)
+    result = users_collection.update_one({"_id": pending["user_id"]}, {"$set": {"password_hash": new_hash}})
+    if result.matched_count == 0:
+        # Extremely unlikely (the account would have to have been
+        # deleted mid-flow) — generic message, no account-existence
+        # detail leaked.
+        raise HTTPException(status_code=400, detail="Could not reset password — request a new code.")
+
+    return SuccessResponse(success=True, message="Password changed successfully.")
 
 
 @router.post("/login", response_model=UserResponse)

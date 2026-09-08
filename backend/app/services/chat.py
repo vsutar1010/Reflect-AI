@@ -13,6 +13,7 @@ from typing import Dict, Iterator, List
 
 from app.adapters import ollama_adapter
 from app.services.ollama_client import OllamaClient
+from app.services.rag import context_builder
 from app.services.twin_engine import MAX_HISTORY, DigitalTwinEngine, SessionNotFoundError
 
 # Below this many not-yet-summarized messages, skip the AI call rather than
@@ -33,10 +34,41 @@ _SUMMARY_SYSTEM_PROMPT = (
 
 
 class TextChatService:
-    def __init__(self, engine: DigitalTwinEngine | None = None):
+    def __init__(self, engine: DigitalTwinEngine | None = None, memory_indexer=None, retrieval_agent=None):
         self.engine = engine or DigitalTwinEngine()
         self.client = OllamaClient()
         self.sessions: Dict[str, dict] = {}
+        # Both optional so this service still works (RAG simply
+        # inactive) when constructed without them, e.g. in tests.
+        self.memory_indexer = memory_indexer
+        self.retrieval_agent = retrieval_agent
+
+    # ============================================================
+    # RAG — long-term memory (additive; any failure here falls back to
+    # exactly the pre-RAG behavior of chat()/stream_chat())
+    # ============================================================
+
+    def _retrieve_memory_context(self, owner_id: str, profile_id: str, message: str) -> str | None:
+        if self.retrieval_agent is None:
+            return None
+        try:
+            result = self.retrieval_agent.retrieve(owner_id, profile_id, message)
+            if not result.memories:
+                return None
+            return context_builder.build_memory_context(result.memories)
+        except Exception as e:
+            print(f"[rag] retrieval failed for profile {profile_id}, continuing without memory context: {e}")
+            return None
+
+    def _index_turn(self, owner_id: str, profile_id: str, role: str, content: str, history_len: int) -> None:
+        if self.memory_indexer is None:
+            return
+        try:
+            self.memory_indexer.index_conversation_turn(
+                profile_id, owner_id, role, content, thread="default", turn_index=history_len - 1, channel="text"
+            )
+        except Exception as e:
+            print(f"[rag] failed to index chat turn for profile {profile_id}: {e}")
 
     # ============================================================
     # Session Management
@@ -80,19 +112,23 @@ class TextChatService:
             raise SessionNotFoundError("Invalid session id")
 
         profile_id = session["profile_id"]
+        owner_id = session["owner_id"]
 
         session["history"] = self.engine.append_message(profile_id, "user", message, channel="text")
+        self._index_turn(owner_id, profile_id, "user", message, len(session["history"]))
 
         dynamic_context = self.engine.build_dynamic_context(
             self.engine.get_recent_user_messages(session["history"])
         )
-        summary = self._catch_up_summary(profile_id, session["history"])
+        summary = self._catch_up_summary(profile_id, session["history"], owner_id=owner_id)
+        memory_context = self._retrieve_memory_context(owner_id, profile_id, message)
 
         messages = self.engine.build_context_window(
             session["system_messages"],
             session["history"],
             dynamic_context=dynamic_context,
             summary=summary,
+            memory_context=memory_context,
         )
 
         # Generous headroom: the current free-tier model spends a chunk
@@ -101,6 +137,7 @@ class TextChatService:
         reply = self.client.chat(messages, temperature=0.6, max_tokens=700)
 
         session["history"] = self.engine.append_message(profile_id, "assistant", reply, channel="text")
+        self._index_turn(owner_id, profile_id, "assistant", reply, len(session["history"]))
 
         return {"reply": reply}
 
@@ -118,19 +155,23 @@ class TextChatService:
             raise SessionNotFoundError("Invalid session id")
 
         profile_id = session["profile_id"]
+        owner_id = session["owner_id"]
 
         session["history"] = self.engine.append_message(profile_id, "user", message, channel="text")
+        self._index_turn(owner_id, profile_id, "user", message, len(session["history"]))
 
         dynamic_context = self.engine.build_dynamic_context(
             self.engine.get_recent_user_messages(session["history"])
         )
-        summary = self._catch_up_summary(profile_id, session["history"])
+        summary = self._catch_up_summary(profile_id, session["history"], owner_id=owner_id)
+        memory_context = self._retrieve_memory_context(owner_id, profile_id, message)
 
         messages = self.engine.build_context_window(
             session["system_messages"],
             session["history"],
             dynamic_context=dynamic_context,
             summary=summary,
+            memory_context=memory_context,
         )
 
         full_reply = []
@@ -140,6 +181,7 @@ class TextChatService:
 
         reply = "".join(full_reply)
         session["history"] = self.engine.append_message(profile_id, "assistant", reply, channel="text")
+        self._index_turn(owner_id, profile_id, "assistant", reply, len(session["history"]))
 
     # ============================================================
     # Conversation Summarization
@@ -160,14 +202,16 @@ class TextChatService:
     # either path again with nothing new to fold in is a no-op (no
     # duplicate AI call, no duplicate write).
 
-    def _catch_up_summary(self, profile_id: str, history: List[dict]) -> str:
+    def _catch_up_summary(self, profile_id: str, history: List[dict], owner_id: str | None = None) -> str:
         """Keeps the stored summary caught up to everything that has fallen
         outside the recent context window, so far-back context is folded
         into the summary instead of being dropped forever."""
         upto = max(0, len(history) - MAX_HISTORY)
-        return self._fold_into_summary(profile_id, history, upto)
+        return self._fold_into_summary(profile_id, history, upto, owner_id=owner_id)
 
-    def _fold_into_summary(self, profile_id: str, history: List[dict], upto: int, thread: str = "default") -> str:
+    def _fold_into_summary(
+        self, profile_id: str, history: List[dict], upto: int, thread: str = "default", owner_id: str | None = None
+    ) -> str:
         """
         Ensures the stored summary covers `history[:upto]`, generating one
         AI call only for the messages not already covered. Never raises —
@@ -223,6 +267,13 @@ class TextChatService:
             return existing_summary
 
         self.engine.save_summary_state(profile_id, new_summary, upto, thread)
+
+        if self.memory_indexer is not None and owner_id is not None:
+            try:
+                self.memory_indexer.index_conversation_summary(profile_id, owner_id, new_summary, thread)
+            except Exception as e:
+                print(f"[rag] failed to index conversation summary for profile {profile_id}: {e}")
+
         return new_summary
 
     def export_chat(self, session_id: str):
@@ -265,7 +316,7 @@ class TextChatService:
         if not history:
             return {"summary": "", "message": "No conversation yet to summarize."}
 
-        summary = self._fold_into_summary(profile_id, history, len(history))
+        summary = self._fold_into_summary(profile_id, history, len(history), owner_id=session.get("owner_id"))
         if not summary:
             return {"summary": "", "message": "Not enough conversation yet to summarize."}
         return {"summary": summary}

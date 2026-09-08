@@ -358,6 +358,7 @@ while preserving the user's identity.
         history: List[dict],
         dynamic_context: Optional[str] = None,
         summary: Optional[str] = None,
+        memory_context: Optional[str] = None,
         max_history: int = MAX_HISTORY,
     ) -> List[Dict[str, str]]:
         """
@@ -365,12 +366,14 @@ while preserving the user's identity.
         system messages (always kept, never dropped), then an optional
         summary of conversation that has already scrolled out of the
         recent window (so context isn't just silently lost once history
-        exceeds max_history), then optionally a fresh dynamic-context
-        system message, then the most recent turns of conversation
-        (capped so token usage stays bounded).
+        exceeds max_history), then optional long-term memory context
+        retrieved from RAG (see app/services/rag/), then optionally a
+        fresh dynamic-context system message, then the most recent turns
+        of conversation (capped so token usage stays bounded).
 
-        `summary` is opt-in (default None) so existing callers — e.g.
-        VoiceChatService — are unaffected unless they explicitly pass one.
+        `summary` and `memory_context` are both opt-in (default None) so
+        existing callers are unaffected unless they explicitly pass one —
+        omitting `memory_context` reproduces pre-RAG behavior exactly.
         """
         conversation = history[-max_history:] if len(history) > max_history else history
         # Strip the "channel" tag before sending to an LLM — it's UI metadata.
@@ -388,6 +391,8 @@ while preserving the user's identity.
                     ),
                 }
             )
+        if memory_context:
+            messages.append({"role": "system", "content": memory_context})
         if dynamic_context:
             messages.append({"role": "system", "content": dynamic_context})
         messages.extend(conversation)

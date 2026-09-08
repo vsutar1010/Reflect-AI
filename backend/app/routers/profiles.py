@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from app.config import VAPI_VOICE_PRESETS
 from app.database import conversations_collection, profiles_collection
-from app.dependencies import engine, get_current_user
+from app.dependencies import engine, get_current_user, memory_store
 from app.schemas import SetProfileVoiceRequest, SuccessResponse
 
 router = APIRouter(prefix="/api/profiles", tags=["profiles"])
@@ -89,6 +89,7 @@ def delete_profile(id: str, current_user: dict = Depends(get_current_user)):
             raise HTTPException(status_code=404, detail="Profile not found")
 
         conversations_collection.delete_many({"profile_id": id})
+        memory_store.delete_profile_memories(id)
         engine.invalidate_cache(id)
         return SuccessResponse(success=True, message=f"Profile {id} deleted successfully.")
     except HTTPException:

@@ -256,6 +256,61 @@ VAPI_CUSTOM_LLM_TIMEOUT_SECONDS = int(os.environ.get("VAPI_CUSTOM_LLM_TIMEOUT_SE
 VAPI_SILENCE_TIMEOUT_SECONDS = int(os.environ.get("VAPI_SILENCE_TIMEOUT_SECONDS", "180"))
 
 
+# ==========================================================
+# Agentic RAG (long-term memory layer)
+# ==========================================================
+# An additional retrieval layer on top of the existing DigitalTwinEngine
+# context — see app/services/rag/. Purely additive: when disabled, or
+# when anything in it fails, chat behaves exactly as it did before this
+# existed (see RetrievalAgent.retrieve and TextChatService).
+RAG_ENABLED = _bool(os.environ.get("RAG_ENABLED"), default=True)
+
+# Which embedding backend to use:
+#   "auto"              -> "openai_compatible" if EMBEDDING_API_KEY is
+#                           set, otherwise "local" (zero-config fallback)
+#   "openai_compatible" -> any provider exposing an OpenAI-style
+#                           POST {base_url}/embeddings endpoint (OpenAI,
+#                           and most hosted-embedding gateways)
+#   "local"              -> deterministic, dependency-free hashing
+#                           embedding — lower quality, but needs no API
+#                           key and never makes a network call; keeps
+#                           RAG fully working out of the box
+EMBEDDING_PROVIDER = os.environ.get("EMBEDDING_PROVIDER", "auto")
+EMBEDDING_API_BASE_URL = os.environ.get("EMBEDDING_API_BASE_URL", "https://api.openai.com/v1")
+EMBEDDING_API_KEY = os.environ.get("EMBEDDING_API_KEY", "")
+EMBEDDING_MODEL = os.environ.get("EMBEDDING_MODEL", "text-embedding-3-small")
+EMBEDDING_DIMENSIONS = _positive_int(os.environ.get("EMBEDDING_DIMENSIONS"), 1536)
+# Dimensionality of the local hashing fallback — independent of
+# EMBEDDING_DIMENSIONS above, which only applies to the API provider.
+LOCAL_EMBEDDING_DIMENSIONS = _positive_int(os.environ.get("LOCAL_EMBEDDING_DIMENSIONS"), 256)
+
+# Name of the MongoDB Atlas Vector Search index on `memories.embedding`
+# (see backend/scripts/setup_memory_vector_index.py). Retrieval always
+# tries this first and transparently falls back to an in-process
+# brute-force cosine search when the index doesn't exist or the cluster
+# doesn't support $vectorSearch — so RAG works before this index is
+# ever created, just less efficiently at scale.
+MEMORY_VECTOR_INDEX_NAME = os.environ.get("MEMORY_VECTOR_INDEX_NAME", "memory_vector_index")
+
+# Agentic retrieval loop bounds (see app/services/rag/retrieval_agent.py)
+RAG_MAX_ITERATIONS = _positive_int(os.environ.get("RAG_MAX_ITERATIONS"), 2)
+RAG_TOP_K = _positive_int(os.environ.get("RAG_TOP_K"), 5)
+# Cosine-similarity floor a memory must clear to be considered relevant.
+# Tuned for the local hashing fallback's similarity scale by default —
+# real embedding APIs generally cluster higher, so raise this if a real
+# provider is configured and irrelevant memories start slipping through.
+RAG_MIN_RELEVANCE_SCORE = float(os.environ.get("RAG_MIN_RELEVANCE_SCORE", "0.12"))
+# Character budget for the memory block injected into the prompt —
+# mirrors the voice-grounding-quotes budget already used in
+# twin_engine.py, so one long memory can't crowd out the rest of the
+# context window.
+RAG_MEMORY_CONTEXT_CHAR_BUDGET = _positive_int(os.environ.get("RAG_MEMORY_CONTEXT_CHAR_BUDGET"), 1500)
+# Cap on how many of a profile's memories the brute-force fallback scans
+# per search — bounds worst-case latency/memory for a profile with a
+# very large indexed history (e.g. a big WhatsApp import).
+RAG_BRUTE_FORCE_SCAN_LIMIT = _positive_int(os.environ.get("RAG_BRUTE_FORCE_SCAN_LIMIT"), 3000)
+
+
 def voice_status() -> tuple[bool, str]:
     """
     Whether enough Vapi config is present to offer Voice Chat, and if not,

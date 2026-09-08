@@ -37,3 +37,71 @@
     animation: none !important;
   }
 }
+
+/* Integrated Technologies marquee (see TechMarquee.jsx) — the track
+   renders each category's chips twice back-to-back and slides exactly
+   half its own width, so the loop point is invisible: the moment the
+   first copy has scrolled fully out, the second copy sits exactly
+   where the first one started. */
+@keyframes marquee-left {
+  from { transform: translate3d(0, 0, 0); }
+  to   { transform: translate3d(-50%, 0, 0); }
+}
+
+@keyframes marquee-right {
+  from { transform: translate3d(-50%, 0, 0); }
+  to   { transform: translate3d(0, 0, 0); }
+}
+
+.tech-marquee-track {
+  animation: marquee-left linear infinite;
+  will-change: transform;
+}
+
+.tech-marquee-track.marquee-reverse {
+  animation-name: marquee-right;
+}
+
+.tech-marquee-track:hover {
+  animation-play-state: paused;
+}
+
+.tech-chip:hover {
+  border-color: color-mix(in srgb, var(--chip-accent) 45%, transparent);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--chip-accent) 18%, transparent),
+    0 10px 28px -10px color-mix(in srgb, var(--chip-accent) 55%, transparent);
+}
+
+/* Diagonal light sweep across a chip on hover — a one-shot CSS
+   transition (not a looping keyframe), so it costs nothing while idle
+   and naturally has a single, non-repeating motion to disable below. */
+.chip-shine {
+  background: linear-gradient(
+    115deg,
+    transparent 30%,
+    color-mix(in srgb, var(--chip-accent) 25%, transparent) 48%,
+    transparent 66%
+  );
+  transform: translateX(-120%);
+  transition: transform 0.7s ease;
+}
+
+.tech-chip:hover .chip-shine {
+  transform: translateX(120%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tech-marquee-track {
+    animation: none !important;
+  }
+
+  .tech-chip:hover {
+    transform: none !important;
+  }
+
+  .chip-shine {
+    transition: none !important;
+    opacity: 0 !important;
+  }
+}

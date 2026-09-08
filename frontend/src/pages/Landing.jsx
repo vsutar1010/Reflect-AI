@@ -1,23 +1,41 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Mic, 
-  Sparkles, 
-  TrendingUp, 
-  Cpu, 
-  MessageSquare, 
-  Brain, 
-  UserCheck, 
+import {
+  Mic,
+  Sparkles,
+  TrendingUp,
+  Cpu,
+  MessageSquare,
+  Brain,
+  UserCheck,
   Send,
   Zap,
   ArrowRight,
   Shield,
   Layers,
-  ChevronRight
+  ChevronRight,
+  Atom,
+  Braces,
+  Terminal,
+  Route,
+  ShieldCheck,
+  Leaf,
+  Cloud,
+  AudioWaveform,
+  Radio,
+  Webhook,
+  Mail,
+  KeyRound,
+  Container,
+  Bot,
+  Workflow,
+  Binary,
+  Waypoints
 } from 'lucide-react';
 import Navbar from '../components/common/Navbar';
 import AnimatedBackground from '../components/common/AnimatedBackground';
+import TechMarquee from '../components/common/TechMarquee';
 import { useAuth } from '../context/AuthContext';
 
 // Image imports (resolved relative to src/assets/)
@@ -29,6 +47,100 @@ import img3Image from '../assets/img3.jpg';
 import chat1Image from '../assets/chat1.jpg';
 import chat2Image from '../assets/chat2.jpg';
 import heroImage from '../assets/hero.png';
+
+// Matches the mark used in Navbar.jsx — lucide-react ships no brand
+// logos, so the project's existing convention is a small hand-drawn
+// GitHub glyph rather than a generic icon standing in for it.
+const GithubMark = ({ className }) => (
+  <svg
+    viewBox="0 0 24 24"
+    stroke="currentColor"
+    strokeWidth="2"
+    fill="none"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+  >
+    <path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4" />
+    <path d="M9 18c-4.51 2-5-2-7-2" />
+  </svg>
+);
+
+// Every entry here is genuinely wired into the codebase — verified
+// against backend/requirements.txt, app/config.py, and app/services/rag/
+// rather than assumed from the project's README. Two notable calls:
+//  - The chat/analysis LLM backend now calls OpenRouter's hosted API
+//    (see app/services/ollama_client.py) even though the module/class
+//    still carry the "Ollama" name from before that migration, so it's
+//    listed here as OpenRouter, not Ollama/Mistral.
+//  - Agentic RAG, embeddings, and MongoDB Atlas Vector Search are listed
+//    because app/services/rag/ (retrieval_agent, embedding_service,
+//    indexer) and RAG_ENABLED in config.py confirm they're live, not
+//    aspirational.
+const TECH_CATEGORIES = [
+  {
+    label: 'AI',
+    direction: 'left',
+    duration: 32,
+    items: [
+      { name: 'OpenRouter', icon: Bot },
+      { name: 'Agentic RAG', icon: Workflow },
+      { name: 'Embeddings', icon: Binary },
+      { name: 'Vector Search', icon: Waypoints }
+    ]
+  },
+  {
+    label: 'Frontend',
+    direction: 'right',
+    duration: 24,
+    items: [
+      { name: 'React', icon: Atom },
+      { name: 'JavaScript', icon: Braces },
+      { name: 'Vite', icon: Zap }
+    ]
+  },
+  {
+    label: 'Backend',
+    direction: 'left',
+    duration: 28,
+    items: [
+      { name: 'Python', icon: Terminal },
+      { name: 'FastAPI', icon: Route },
+      { name: 'Pydantic', icon: ShieldCheck }
+    ]
+  },
+  {
+    label: 'Data',
+    direction: 'right',
+    duration: 20,
+    items: [
+      { name: 'MongoDB', icon: Leaf },
+      { name: 'MongoDB Atlas', icon: Cloud }
+    ]
+  },
+  {
+    label: 'Communication & Infrastructure',
+    direction: 'left',
+    duration: 34,
+    items: [
+      { name: 'Vapi', icon: AudioWaveform },
+      { name: 'SSE', icon: Radio },
+      { name: 'Webhooks', icon: Webhook },
+      { name: 'SMTP', icon: Mail },
+      { name: 'JWT', icon: KeyRound },
+      { name: 'Google Sign-In', icon: null }
+    ]
+  },
+  {
+    label: 'Development',
+    direction: 'right',
+    duration: 22,
+    items: [
+      { name: 'Docker', icon: Container },
+      { name: 'GitHub', icon: GithubMark }
+    ]
+  }
+];
 
 export default function Landing() {
   const { user } = useAuth();
@@ -463,15 +575,49 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* --- SECTION 6: TECHNOLOGY STACKS --- */}
-      <section id="technology" className="relative py-20 z-10 border-t border-white/5">
-        <div className="max-w-7xl mx-auto px-6 text-center">
-          <p className="text-xs uppercase tracking-widest text-[#8B5CF6] font-bold mb-8">Integrated Technologies</p>
-          <div className="flex flex-wrap items-center justify-center gap-8 md:gap-16 opacity-40 hover:opacity-60 transition-opacity duration-300">
-            {['FastAPI', 'React', 'OpenRouter', 'MongoDB', 'Tailwind', 'Vapi'].map((tech, idx) => (
-              <span key={idx} className="text-base md:text-lg font-mono font-bold tracking-wider text-slate-400">
-                {tech}
-              </span>
+      {/* --- SECTION 6: INTEGRATED TECHNOLOGIES --- */}
+      <section id="technology" className="relative py-20 md:py-24 z-10 border-t border-white/5 overflow-hidden">
+        {/* Ambient glow + dot grid, matching the hero/AnimatedBackground look */}
+        <div className="absolute inset-0 pointer-events-none overflow-hidden">
+          <div className="absolute inset-0 opacity-[0.05] [background-image:radial-gradient(circle,rgba(255,255,255,0.7)_1px,transparent_1px)] [background-size:36px_36px]" />
+          <div className="bg-blob bg-blob-a absolute top-[10%] left-[-10%] w-[45%] h-[60%] rounded-full bg-[#4F8BFF]/10 blur-[110px]" />
+          <div className="bg-blob bg-blob-b absolute bottom-[-10%] right-[-10%] w-[45%] h-[60%] rounded-full bg-[#8B5CF6]/10 blur-[110px]" />
+        </div>
+
+        <div className="relative max-w-7xl mx-auto px-6">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6 }}
+            className="text-center mb-16"
+          >
+            <h2 className="text-xs uppercase tracking-widest text-[#8B5CF6] font-extrabold mb-3">Under the Hood</h2>
+            <h3 className="text-3xl md:text-4xl font-bold">Integrated Technologies</h3>
+            <div className="mx-auto mt-4 h-px w-16 bg-gradient-to-r from-transparent via-[#8B5CF6]/60 to-transparent" />
+            <p className="text-slate-400 max-w-xl mx-auto mt-4 text-sm md:text-base">
+              The real stack powering memory, reasoning, and voice for every digital twin — nothing here is aspirational.
+            </p>
+          </motion.div>
+
+          <div className="flex flex-col gap-8 md:gap-12">
+            {TECH_CATEGORIES.map((category, idx) => (
+              <motion.div
+                key={category.label}
+                initial={{ opacity: 0, y: 16 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.5, delay: idx * 0.06 }}
+              >
+                <div className="flex items-center justify-center gap-3 mb-4">
+                  <span className="h-px w-8 md:w-12 bg-gradient-to-r from-transparent to-white/15" />
+                  <p className="text-center text-[11px] uppercase tracking-[0.2em] text-slate-500 font-semibold whitespace-nowrap">
+                    {category.label}
+                  </p>
+                  <span className="h-px w-8 md:w-12 bg-gradient-to-l from-transparent to-white/15" />
+                </div>
+                <TechMarquee items={category.items} direction={category.direction} duration={category.duration} />
+              </motion.div>
             ))}
           </div>
         </div>
@@ -488,7 +634,7 @@ export default function Landing() {
           </div>
 
           <div className="flex items-center gap-8">
-            <a href="https://github.com" target="_blank" rel="noopener noreferrer" className="text-xs text-slate-400 hover:text-white transition-colors">Github</a>
+            <a href="https://github.com/vsutar1010/Reflect-AI" target="_blank" rel="noopener noreferrer" className="text-xs text-slate-400 hover:text-white transition-colors">Github</a>
             <a href="https://drive.google.com/file/d/1yt44K3JSV8k-s4OMm_hrn_qfH6eXGnBO/view?usp=drivesdk" target="_blank" rel="noopener noreferrer" className="text-xs text-slate-400 hover:text-white transition-colors">Documentation</a>
             <a href="https://drive.google.com/file/d/15_XqFhSHO3M9yMloZXqNDtJMKqWrXP3Q/view?usp=drivesdk" target="_blank" rel="noopener noreferrer" className="text-xs text-slate-400 hover:text-white transition-colors">Privacy Policy</a>
           </div>

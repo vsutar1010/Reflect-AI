@@ -13,17 +13,27 @@ from app.database import users_collection
 from app.services import auth_service
 from app.services.analyzer import PersonalityAnalyzer
 from app.services.chat import TextChatService
+from app.services.rag.indexer import get_indexer
+from app.services.rag.memory_store import MemoryStore
+from app.services.rag.retrieval_agent import get_retrieval_agent
 from app.services.reflect_service import ReflectService
 from app.services.twin_engine import DigitalTwinEngine
 from app.services.voice_chat_service import VoiceChatService
 from app.services.whatsapp_import_service import WhatsAppImportService
 
-analyzer = PersonalityAnalyzer()
+# RAG singletons — built once and shared, same reasoning as the rest of
+# this file: one memory store / retrieval agent / indexer per process,
+# not one per request. See app/services/rag/.
+memory_store = MemoryStore()
+memory_indexer = get_indexer()
+retrieval_agent = get_retrieval_agent()
+
+analyzer = PersonalityAnalyzer(memory_indexer=memory_indexer)
 whatsapp_import_service = WhatsAppImportService()
 
 engine = DigitalTwinEngine()
-text_chat_service = TextChatService(engine)
-voice_chat_service = VoiceChatService(engine)
+text_chat_service = TextChatService(engine, memory_indexer=memory_indexer, retrieval_agent=retrieval_agent)
+voice_chat_service = VoiceChatService(engine, memory_indexer=memory_indexer, retrieval_agent=retrieval_agent)
 reflect_service = ReflectService()
 
 
