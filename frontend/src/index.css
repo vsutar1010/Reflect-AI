@@ -105,3 +105,26 @@
     opacity: 0 !important;
   }
 }
+
+/* Chat panel hug artwork (see ChatHugBackground.jsx) — the image file
+   itself is static; this is the only motion, a slow whole-image opacity/
+   scale "breathe" so it reads as ambient rather than animated. Scale-only
+   (no translate) keeps a `background-size: cover`-style image centered
+   while it breathes. */
+@keyframes hug-breathe {
+  0%   { opacity: 0.55; transform: scale(1); }
+  50%  { opacity: 0.75; transform: scale(1.03); }
+  100% { opacity: 0.55; transform: scale(1); }
+}
+
+.chat-hug-img {
+  animation: hug-breathe 9s ease-in-out infinite;
+  will-change: transform, opacity;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-hug-img {
+    animation: none !important;
+    opacity: 0.65;
+  }
+}

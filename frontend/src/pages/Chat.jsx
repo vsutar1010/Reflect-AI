@@ -5,6 +5,7 @@ import Navbar from '../components/common/Navbar';
 import Button from '../components/common/Button';
 import Loader from '../components/common/Loader';
 import AnimatedBackground from '../components/common/AnimatedBackground';
+import ChatHugBackground from '../components/features/chat/ChatHugBackground';
 import MessageList from '../components/features/chat/MessageList';
 import ChatInput from '../components/features/chat/ChatInput';
 import { useProfile } from '../context/ProfileContext';
@@ -173,11 +174,11 @@ export default function Chat() {
   }
 
   return (
-    <div className="relative min-h-screen bg-[#050505] text-white flex flex-col">
+    <div className="relative h-screen overflow-hidden bg-[#050505] text-white flex flex-col">
       <AnimatedBackground />
       <Navbar />
 
-      <div className="relative z-10 flex-1 flex flex-col max-w-3xl w-full mx-auto pt-28 pb-6 px-4 h-screen">
+      <div className="relative z-10 flex-1 flex flex-col min-h-0 max-w-3xl w-full mx-auto pt-28 pb-6 px-4">
         <div className="flex items-center justify-between mb-4 px-1">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-gradient-to-r from-[#4F8BFF] to-[#8B5CF6] flex items-center justify-center font-bold text-white shadow-[0_0_10px_rgba(79,139,255,0.4)]">
@@ -200,25 +201,31 @@ export default function Chat() {
           </div>
         )}
 
-        <div className="flex-1 flex flex-col bg-[#09090B]/40 backdrop-blur-xl border border-white/10 rounded-3xl overflow-hidden">
-          {loadingSession ? (
-            <div className="flex-1 flex items-center justify-center">
-              <Loader text="Waking up your twin..." />
-            </div>
-          ) : (
-            <MessageList
-              messages={messages}
-              isTyping={isTyping && !messages.some((m) => m.streaming)}
-              twinInitial={selectedProfile.name}
-            />
-          )}
+        <div className="relative flex-1 flex flex-col min-h-0 bg-[#09090B]/40 backdrop-blur-xl border border-white/10 rounded-3xl overflow-hidden">
+          <ChatHugBackground />
 
-          <ChatInput
-            value={input}
-            onChange={setInput}
-            onSend={handleSend}
-            disabled={loadingSession || isTyping || !sessionId}
-          />
+          <div className="relative z-10 flex-1 flex flex-col min-h-0">
+            {loadingSession ? (
+              <div className="flex-1 flex items-center justify-center">
+                <Loader text="Waking up your twin..." />
+              </div>
+            ) : (
+              <MessageList
+                messages={messages}
+                isTyping={isTyping && !messages.some((m) => m.streaming)}
+                twinInitial={selectedProfile.name}
+              />
+            )}
+          </div>
+
+          <div className="relative z-10">
+            <ChatInput
+              value={input}
+              onChange={setInput}
+              onSend={handleSend}
+              disabled={loadingSession || isTyping || !sessionId}
+            />
+          </div>
         </div>
       </div>
     </div>
